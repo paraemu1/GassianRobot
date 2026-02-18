@@ -1,0 +1,30 @@
+services:
+  rtabmap:
+    image: ${RTABMAP_IMAGE:-gassian/ros2-humble-rtabmap:latest}
+    container_name: ${RTABMAP_CONTAINER:-ros_humble_rtabmap}
+    network_mode: host
+    ipc: host
+    privileged: true
+    stdin_open: true
+    tty: true
+    working_dir: /robot_ws
+    volumes:
+      - ${WORKSPACE_DIR:-$HOME/robot_ws}:/robot_ws
+      - ${RUNS_DIR:-$PWD/runs}:/runs
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    command: bash -lc "source /opt/ros/humble/setup.bash && exec bash"
+
+  gsplat_train:
+    image: ${TRAIN_IMAGE:-gassian/gsplat-train:latest}
+    container_name: ${TRAIN_CONTAINER:-gsplat_train}
+    network_mode: host
+    ipc: host
+    runtime: nvidia
+    stdin_open: true
+    tty: true
+    working_dir: /workspace
+    volumes:
+      - ${RUNS_DIR:-$PWD/runs}:/workspace/runs
+      - ${WORKSPACE_DIR:-$HOME/robot_ws}:/workspace/robot_ws
+    command: bash -lc "python3 --version && exec bash"
