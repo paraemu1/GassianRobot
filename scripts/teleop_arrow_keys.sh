@@ -14,6 +14,7 @@ LINEAR_SPEED="${LINEAR_SPEED:-0.12}"
 ANGULAR_SPEED="${ANGULAR_SPEED:-0.8}"
 CMD_TIMEOUT="${CMD_TIMEOUT:-0.35}"
 DEBUG_TELEOP="${DEBUG_TELEOP:-0}"
+SHOW_BLOCK_STATUS="${SHOW_BLOCK_STATUS:-1}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PY_SCRIPT="$SCRIPT_DIR/teleop_arrow_keys.py"
 
@@ -55,5 +56,6 @@ docker run --rm -it --network host \
   -e ANGULAR_SPEED="$ANGULAR_SPEED" \
   -e CMD_TIMEOUT="$CMD_TIMEOUT" \
   -e DEBUG_TELEOP="$DEBUG_TELEOP" \
+  -e SHOW_BLOCK_STATUS="$SHOW_BLOCK_STATUS" \
   "$IMAGE_TAG" \
   bash -lc "source /opt/ros/humble/setup.bash && python3 /robot_ws/scripts/teleop_arrow_keys.py"

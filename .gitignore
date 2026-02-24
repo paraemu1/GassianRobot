@@ -1,1 +1,10 @@
 .tmp/
+scripts/__pycache__/
+assets/images/oak/
+runs/*
+!runs/README.md
+!runs/_template/
+!runs/_template/**
+!runs/camera_health/
+runs/camera_health/*
+!runs/camera_health/.gitkeep

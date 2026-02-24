@@ -13,10 +13,13 @@ set -euo pipefail
 VIDEO_PATH=""
 RUN_DIR=""
 DOWNSCALE=1
+PROCESS_GPU="${PROCESS_GPU:-0}" # 1 to enable GPU SIFT in COLMAP
 USE_DOCKER=1
 MODE="video"
 DATASET_DIR=""
-TRAIN_IMAGE="${TRAIN_IMAGE:-gassian/gsplat-train:latest}"
+TRAIN_IMAGE="${TRAIN_IMAGE:-gassian/gsplat-train:jetson-compatible}"
+TRAIN_EXTRA_ARGS="${TRAIN_EXTRA_ARGS:-}"
+PREAMBLE_CMD="python3 -m pip uninstall -y opencv-python opencv-python-headless >/dev/null 2>&1 || true; rm -rf /usr/local/lib/python3.8/dist-packages/cv2 /usr/local/lib/python3.8/dist-packages/cv2.*; python3 -m pip install --no-cache-dir opencv-python-headless==4.8.1.78 >/dev/null"
 
 usage() {
   echo "Usage:"
@@ -102,6 +105,11 @@ fi
 
 mkdir -p "${RUN_DIR}/dataset" "${RUN_DIR}/checkpoints" "${RUN_DIR}/exports" "${RUN_DIR}/logs"
 
+process_gpu_flag="--no-gpu"
+if [[ "$PROCESS_GPU" == "1" || "$PROCESS_GPU" == "true" || "$PROCESS_GPU" == "True" ]]; then
+  process_gpu_flag="--gpu"
+fi
+
 run_host() {
   for cmd in ns-process-data ns-train ns-export; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -115,19 +123,29 @@ run_host() {
     ns-process-data video \
       --data "$VIDEO_PATH" \
       --output-dir "${RUN_DIR}/dataset" \
-      --downscale-factor "$DOWNSCALE" \
+      --num-downscales "$DOWNSCALE" \
+      "$process_gpu_flag" \
       2>&1 | tee "${RUN_DIR}/logs/ns-process-data.log"
   else
     echo "[1/3] Skipping process stage; using dataset: $DATASET_DIR"
-    rm -rf "${RUN_DIR}/dataset"
-    mkdir -p "${RUN_DIR}/dataset"
-    cp -a "${DATASET_DIR}/." "${RUN_DIR}/dataset/"
+    local dataset_abs target_abs
+    dataset_abs="$(realpath "$DATASET_DIR")"
+    target_abs="$(realpath -m "${RUN_DIR}/dataset")"
+    if [[ "$dataset_abs" == "$target_abs" ]]; then
+      echo "Dataset source matches ${RUN_DIR}/dataset; leaving existing dataset in place."
+    else
+      rm -rf "${RUN_DIR}/dataset"
+      mkdir -p "${RUN_DIR}/dataset"
+      cp -a "${DATASET_DIR}/." "${RUN_DIR}/dataset/"
+    fi
   fi
 
   echo "[2/3] Training splatfacto (host)"
+  # shellcheck disable=SC2086
   ns-train splatfacto \
     --data "${RUN_DIR}/dataset" \
     --output-dir "${RUN_DIR}/checkpoints" \
+    $TRAIN_EXTRA_ARGS \
     2>&1 | tee "${RUN_DIR}/logs/ns-train.log"
 }
 
@@ -171,11 +189,17 @@ run_docker() {
   fi
 
   if [[ "$MODE" == "video" || "$MODE" == "run_env" ]]; then
-    process_cmd="ns-process-data video --data /workspace/${rel_video} --output-dir /workspace/${rel_run}/dataset --downscale-factor ${DOWNSCALE}"
+    process_cmd="${PREAMBLE_CMD} && ns-process-data video --data /workspace/${rel_video} --output-dir /workspace/${rel_run}/dataset --num-downscales ${DOWNSCALE} ${process_gpu_flag}"
   else
-    process_cmd="rm -rf /workspace/${rel_run}/dataset && mkdir -p /workspace/${rel_run}/dataset && cp -a /workspace/${rel_dataset}/. /workspace/${rel_run}/dataset/"
+    local run_dataset_abs
+    run_dataset_abs="${abs_run}/dataset"
+    if [[ "$abs_dataset" == "$run_dataset_abs" ]]; then
+      process_cmd="echo 'Dataset source matches target; leaving /workspace/${rel_run}/dataset in place.' && mkdir -p /workspace/${rel_run}/dataset"
+    else
+      process_cmd="rm -rf /workspace/${rel_run}/dataset && mkdir -p /workspace/${rel_run}/dataset && cp -a /workspace/${rel_dataset}/. /workspace/${rel_run}/dataset/"
+    fi
   fi
-  train_cmd="ns-train splatfacto --data /workspace/${rel_run}/dataset --output-dir /workspace/${rel_run}/checkpoints"
+  train_cmd="${PREAMBLE_CMD} && ns-train splatfacto --data /workspace/${rel_run}/dataset --output-dir /workspace/${rel_run}/checkpoints ${TRAIN_EXTRA_ARGS}"
 
   if [[ "$MODE" == "video" || "$MODE" == "run_env" ]]; then
     echo "[1/3] Processing video -> dataset (docker)"
@@ -221,7 +245,7 @@ if [[ "$USE_DOCKER" -eq 1 ]]; then
   docker run --rm --network host --ipc host --runtime nvidia \
     -v "${PWD}:/workspace" -w /workspace \
     "$TRAIN_IMAGE" \
-    bash -lc "ns-export gaussian-splat --load-config /workspace/${rel_config} --output-dir /workspace/${rel_run}/exports/splat" \
+    bash -lc "${PREAMBLE_CMD}; ns-export gaussian-splat --load-config /workspace/${rel_config} --output-dir /workspace/${rel_run}/exports/splat" \
     2>&1 | tee "${RUN_DIR}/logs/ns-export.log"
 else
   echo "[3/3] Export gaussian splat (host)"
