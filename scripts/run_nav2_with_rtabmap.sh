@@ -51,4 +51,19 @@ if [[ -n "$NAMESPACE" ]]; then
   launch_args+=("namespace:=$NAMESPACE")
 fi
 
-ros2 launch nav2_bringup navigation_launch.py "${launch_args[@]}"
+if command -v ros2 >/dev/null 2>&1; then
+  ros2 launch nav2_bringup navigation_launch.py "${launch_args[@]}"
+  exit $?
+fi
+
+if docker ps --format '{{.Names}}' | grep -Fxq "$ROS_CONTAINER"; then
+  docker exec -it "$ROS_CONTAINER" bash -lc "source /opt/ros/humble/setup.bash && ros2 launch nav2_bringup navigation_launch.py ${launch_args[*]}"
+  exit $?
+fi
+
+docker run --rm -it --network host --ipc host \
+  -e RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}" \
+  -e ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}" \
+  -e ROS_LOCALHOST_ONLY="${ROS_LOCALHOST_ONLY:-0}" \
+  -e CYCLONEDDS_URI="${CYCLONEDDS_URI:-}" \
+  "$ROS_IMAGE" bash -lc "source /opt/ros/humble/setup.bash && ros2 launch nav2_bringup navigation_launch.py ${launch_args[*]}"

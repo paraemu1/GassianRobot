@@ -52,6 +52,11 @@ def main() -> int:
         default="runs/camera_health",
         help="Directory to store captured artifacts (default: runs/camera_health)",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print planned checks without connecting to hardware.",
+    )
     args = parser.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -61,6 +66,13 @@ def main() -> int:
     rgb_path = out_dir / f"oak_rgb_{ts}.jpg"
     depth_raw_path = out_dir / f"oak_depth_{ts}.png"
     depth_color_path = out_dir / f"oak_depth_color_{ts}.jpg"
+
+    if args.dry_run:
+        log("[INFO] Dry run mode; no camera access will be attempted.")
+        log(f"[INFO] Would write RGB image to: {rgb_path}")
+        log(f"[INFO] Would write depth raw image to: {depth_raw_path}")
+        log(f"[INFO] Would write depth color image to: {depth_color_path}")
+        return 0
 
     log("[INFO] Searching for OAK device...")
     devices = dai.Device.getAllAvailableDevices()

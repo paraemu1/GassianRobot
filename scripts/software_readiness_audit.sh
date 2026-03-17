@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+OUT_DIR="${REPO_ROOT}/runs/system_audit"
+mkdir -p "$OUT_DIR"
+STAMP="$(date +%F_%H%M%S)"
+OUT_FILE="${OUT_DIR}/audit_${STAMP}.txt"
+
+pass=0
+fail=0
+warn=0
+
+p() { echo "[PASS] $*" | tee -a "$OUT_FILE"; pass=$((pass+1)); }
+w() { echo "[WARN] $*" | tee -a "$OUT_FILE"; warn=$((warn+1)); }
+f() { echo "[FAIL] $*" | tee -a "$OUT_FILE"; fail=$((fail+1)); }
+
+check_cmd() {
+  local c="$1"
+  if command -v "$c" >/dev/null 2>&1; then p "command present: $c"; else f "command missing: $c"; fi
+}
+
+{
+  echo "# GassianRobot software readiness audit"
+  echo "timestamp: $(date -Iseconds)"
+  echo "repo: $REPO_ROOT"
+  echo ""
+} > "$OUT_FILE"
+
+check_cmd docker
+check_cmd python3
+check_cmd bash
+check_cmd ip
+check_cmd ping
+
+if docker info >/dev/null 2>&1; then
+  p "docker daemon reachable"
+else
+  f "docker daemon not reachable"
+fi
+
+for img in gassian/ros2-humble-rtabmap:latest gassian/gsplat-train:latest; do
+  if docker image inspect "$img" >/dev/null 2>&1; then p "docker image present: $img"; else w "docker image missing: $img"; fi
+done
+
+for s in scripts/control_center.sh scripts/teleop_drive_app.sh scripts/teleop_drive_app.py scripts/run_nav2_with_rtabmap.sh scripts/run_rtabmap_rgbd.sh scripts/send_nav2_goal.sh scripts/run_auto_scan_mission.sh; do
+  if [[ -f "$REPO_ROOT/$s" ]]; then p "file exists: $s"; else f "missing file: $s"; fi
+done
+
+if [[ -x "$REPO_ROOT/scripts/control_center.sh" ]]; then p "control_center executable"; else w "control_center not executable"; fi
+
+if ip link show l4tbr0 >/dev/null 2>&1; then
+  p "network iface present: l4tbr0"
+  state="$(cat /sys/class/net/l4tbr0/operstate 2>/dev/null || true)"
+  if [[ "$state" == "up" ]]; then p "l4tbr0 is up"; else w "l4tbr0 not up (state=$state)"; fi
+else
+  w "network iface missing: l4tbr0"
+fi
+
+if ping -I l4tbr0 -c 1 -W 1 192.168.186.2 >/dev/null 2>&1; then
+  p "Create3 reachable on USB-C endpoint"
+else
+  w "Create3 not reachable right now (expected if disconnected)"
+fi
+
+avail_kb="$(df -Pk "$REPO_ROOT" | awk 'NR==2{print $4}')"
+if [[ "$avail_kb" -gt 5242880 ]]; then
+  p "disk free > 5GB"
+else
+  w "disk free < 5GB"
+fi
+
+echo "" | tee -a "$OUT_FILE"
+echo "Summary: pass=$pass warn=$warn fail=$fail" | tee -a "$OUT_FILE"
+echo "Report: $OUT_FILE" | tee -a "$OUT_FILE"
+
+if [[ "$fail" -gt 0 ]]; then
+  exit 1
+fi

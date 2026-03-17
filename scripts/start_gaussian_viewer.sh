@@ -9,21 +9,23 @@ RUN_DIR=""
 PORT=7007
 TRAIN_IMAGE="${TRAIN_IMAGE:-gassian/gsplat-train:jetson-compatible}"
 CONTAINER_NAME=""
+DRY_RUN=0
 
 usage() {
-  cat <<'EOF'
+  cat <<'USAGE'
 Start a web viewer for a trained Gaussian run.
 
 Usage:
   ./scripts/start_gaussian_viewer.sh [--run <runs/YYYY-MM-DD-scene>|latest] [options]
 
 Options:
-  --run <path|latest>      Run directory. Default: latest.
+  --run <path|latest>      Run directory. Default: latest viewer-ready run.
   --port <N>               Viewer port on host (default: 7007).
   --train-image <tag>      Docker image tag (default: gassian/gsplat-train:jetson-compatible).
   --container-name <name>  Optional custom container name.
+  --dry-run                Validate inputs and print container launch command.
   -h, --help               Show this help.
-EOF
+USAGE
 }
 
 while [[ $# -gt 0 ]]; do
@@ -44,6 +46,10 @@ while [[ $# -gt 0 ]]; do
       CONTAINER_NAME="$2"
       shift 2
       ;;
+    --dry-run)
+      DRY_RUN=1
+      shift 1
+      ;;
     -h|--help)
       usage
       exit 0
@@ -56,17 +62,19 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if ! command -v docker >/dev/null 2>&1; then
-  echo "Missing required command: docker" >&2
-  exit 1
+if [[ "$DRY_RUN" -eq 0 ]]; then
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "Missing required command: docker" >&2
+    exit 1
+  fi
+
+  if ! docker info >/dev/null 2>&1; then
+    echo "Docker daemon is not reachable. Start Docker and retry." >&2
+    exit 1
+  fi
 fi
 
-if ! docker info >/dev/null 2>&1; then
-  echo "Docker daemon is not reachable. Start Docker and retry." >&2
-  exit 1
-fi
-
-if ! RUN_DIR="$(run_utils_resolve_run_dir "$REPO_ROOT" "$RUN_DIR")"; then
+if ! RUN_DIR="$(run_utils_resolve_run_dir_for_context "$REPO_ROOT" "$RUN_DIR" "viewer_ready")"; then
   run_utils_list_runs "$REPO_ROOT" >&2
   exit 1
 fi
@@ -96,6 +104,20 @@ fi
 
 preamble_cmd="python3 -m pip uninstall -y opencv-python opencv-python-headless >/dev/null 2>&1 || true; rm -rf /usr/local/lib/python3.8/dist-packages/cv2 /usr/local/lib/python3.8/dist-packages/cv2.*; python3 -m pip install --no-cache-dir opencv-python-headless==4.8.1.78 >/dev/null"
 viewer_cmd="${preamble_cmd}; ns-viewer --load-config /workspace/${rel_config} --viewer.websocket-host 0.0.0.0 --viewer.websocket-port ${PORT}"
+
+if [[ "$DRY_RUN" -eq 1 ]]; then
+  echo "Dry run: start_gaussian_viewer.sh"
+  echo "Run: $RUN_DIR"
+  echo "Config: $latest_config"
+  echo "Container: $CONTAINER_NAME"
+  echo "Train image: $TRAIN_IMAGE"
+  echo "Port: $PORT"
+  echo "Viewer command:"
+  echo "  $viewer_cmd"
+  echo "Local URL: http://localhost:${PORT}"
+  echo "LAN URL:   http://<jetson-ip>:${PORT}"
+  exit 0
+fi
 
 docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 docker run -d \

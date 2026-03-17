@@ -7,9 +7,10 @@ source "${SCRIPT_DIR}/_run_utils.sh"
 
 RUN_DIR=""
 FORCE=0
+DRY_RUN=0
 
 usage() {
-  cat <<'EOF'
+  cat <<'USAGE'
 Stop a background Gaussian training job started by start_gaussian_training_job.sh.
 
 Usage:
@@ -17,10 +18,11 @@ Usage:
 
 Options:
   --run <path|latest>
-                Run directory. Default: latest.
+                Run directory. Default: latest run with training metadata.
   --force       Send SIGKILL if the process does not stop after SIGTERM.
+  --dry-run     Resolve target and print what would be stopped.
   -h, --help    Show this help.
-EOF
+USAGE
 }
 
 while [[ $# -gt 0 ]]; do
@@ -31,6 +33,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --force)
       FORCE=1
+      shift 1
+      ;;
+    --dry-run)
+      DRY_RUN=1
       shift 1
       ;;
     -h|--help)
@@ -45,27 +51,81 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if ! RUN_DIR="$(run_utils_resolve_run_dir "$REPO_ROOT" "$RUN_DIR")"; then
+if ! RUN_DIR="$(run_utils_resolve_run_dir_for_context "$REPO_ROOT" "$RUN_DIR" "train_metadata")"; then
   run_utils_list_runs "$REPO_ROOT" >&2
   exit 1
 fi
 
+status_env="$(${SCRIPT_DIR}/training_job_status.sh --run "$RUN_DIR" --format env)"
+
+state=""
+pid=""
+active_pid=0
 pid_file="${RUN_DIR}/logs/train_job.pid"
+status_file="${RUN_DIR}/logs/train_job.status"
 
-if [[ ! -f "$pid_file" ]]; then
-  echo "PID file not found: $pid_file" >&2
-  exit 1
+while IFS='=' read -r key value; do
+  case "$key" in
+    STATE) state="$value" ;;
+    PID) pid="$value" ;;
+    ACTIVE_PID) active_pid="$value" ;;
+    PID_FILE) pid_file="$value" ;;
+    STATUS_FILE) status_file="$value" ;;
+  esac
+done <<< "$status_env"
+
+write_exited_status() {
+  local exit_code="$1"
+  local started_at mode log_file launcher
+  started_at="$(run_utils_read_status_value "$status_file" "started_at" || true)"
+  mode="$(run_utils_read_status_value "$status_file" "mode" || true)"
+  log_file="$(run_utils_read_status_value "$status_file" "log_file" || true)"
+  launcher="$(run_utils_read_status_value "$status_file" "launcher" || true)"
+
+  if [[ -z "$started_at" ]]; then
+    started_at="$(date -Is)"
+  fi
+
+  cat > "$status_file" <<STATUS
+state=exited
+run_dir=${RUN_DIR}
+pid=${pid}
+started_at=${started_at}
+ended_at=$(date -Is)
+exit_code=${exit_code}
+mode=${mode}
+log_file=${log_file}
+launcher=${launcher}
+STATUS
+}
+
+if [[ "$DRY_RUN" -eq 1 ]]; then
+  echo "Dry run: stop_gaussian_training_job.sh"
+  echo "Run: $RUN_DIR"
+  echo "State: $state"
+  echo "PID: ${pid:-<none>}"
+  echo "Active PID: $active_pid"
+  echo "PID file: $pid_file"
+  echo "Status file: $status_file"
+  exit 0
 fi
 
-pid="$(cat "$pid_file" 2>/dev/null || true)"
 if [[ -z "$pid" ]]; then
-  echo "PID file is empty: $pid_file" >&2
-  exit 1
+  echo "No PID recorded for run: $RUN_DIR"
+  if [[ "$state" == "running" && -f "$status_file" ]]; then
+    write_exited_status 143
+    echo "Updated stale running status to exited (143)."
+  fi
+  exit 0
 fi
 
-if ! ps -p "$pid" >/dev/null 2>&1; then
-  echo "Process $pid is not running. Removing stale PID file."
+if [[ "$active_pid" -ne 1 ]]; then
+  echo "Process $pid is not running."
   rm -f "$pid_file"
+  if [[ "$state" == "running" && -f "$status_file" ]]; then
+    write_exited_status 143
+    echo "Updated stale running status to exited (143)."
+  fi
   exit 0
 fi
 
@@ -92,4 +152,8 @@ if ps -p "$pid" >/dev/null 2>&1; then
 fi
 
 rm -f "$pid_file"
+if [[ -f "$status_file" ]]; then
+  write_exited_status 143
+fi
+
 echo "Stopped."

@@ -60,6 +60,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Start capture immediately (skip Enter prompt)",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print planned capture/prep commands without touching camera or files.",
+    )
     return parser.parse_args()
 
 
@@ -96,6 +101,76 @@ def main() -> int:
     args = parse_args()
     root = repo_root()
     scripts_dir = root / "scripts"
+
+    if args.dry_run:
+        date_stamp = dt.date.today().isoformat()
+        run_preview = root / "runs" / f"{date_stamp}-{args.scene}"
+        print("\n=== Manual Handheld Camera Motion Test (Dry Run) ===")
+        print(f"Would create run folder near: {run_preview}")
+        print(f"Capture duration: {args.duration:.1f}s")
+        print(f"Blur filter threshold: {args.blur_threshold}")
+        print("\nPlanned commands:")
+        print(
+            "  "
+            + " ".join(
+                [
+                    str(scripts_dir / "record_oak_rgb_video.sh"),
+                    "--output",
+                    str(run_preview / "raw" / "capture_raw.mp4"),
+                    "--duration",
+                    str(args.duration),
+                    "--width",
+                    str(args.width),
+                    "--height",
+                    str(args.height),
+                    "--fps",
+                    str(args.fps),
+                    "--sensor-resolution",
+                    args.sensor_resolution,
+                ]
+            )
+        )
+        print(
+            "  "
+            + " ".join(
+                [
+                    str(scripts_dir / "filter_blurry_video_frames.sh"),
+                    "--input",
+                    str(run_preview / "raw" / "capture_raw.mp4"),
+                    "--output",
+                    str(run_preview / "raw" / "capture.mp4"),
+                    "--threshold",
+                    str(args.blur_threshold),
+                    "--report-csv",
+                    str(run_preview / "logs" / "blur_filter_report.csv"),
+                ]
+            )
+        )
+        print(
+            "  "
+            + " ".join(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    str(run_preview / "raw" / "capture.mp4"),
+                    "-vf",
+                    f"fps={args.frame_sample_fps}",
+                    str(run_preview / "raw" / "images" / "frame_%05d.jpg"),
+                ]
+            )
+        )
+        print(
+            "  "
+            + " ".join(
+                [
+                    str(scripts_dir / "prepare_gs_input_from_run.sh"),
+                    "--run",
+                    str(run_preview),
+                ]
+            )
+        )
+        return 0
 
     try:
         run_dir = create_run_folder(root, args.scene)

@@ -8,9 +8,10 @@ source "${SCRIPT_DIR}/_run_utils.sh"
 RUN_DIR=""
 LINES=80
 FOLLOW=1
+DRY_RUN=0
 
 usage() {
-  cat <<'EOF'
+  cat <<'USAGE'
 Watch logs for a long-running Gaussian training job.
 
 Usage:
@@ -18,11 +19,12 @@ Usage:
 
 Options:
   --run <path|latest>
-                  Run directory. Default: latest.
+                  Run directory. Default: latest run with training logs.
   --lines <N>     Number of log lines to show before following (default: 80).
   --no-follow     Print lines and exit.
+  --dry-run       Validate log discovery and print the tail command.
   -h, --help      Show this help.
-EOF
+USAGE
 }
 
 while [[ $# -gt 0 ]]; do
@@ -39,6 +41,10 @@ while [[ $# -gt 0 ]]; do
       FOLLOW=0
       shift 1
       ;;
+    --dry-run)
+      DRY_RUN=1
+      shift 1
+      ;;
     -h|--help)
       usage
       exit 0
@@ -51,7 +57,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if ! RUN_DIR="$(run_utils_resolve_run_dir "$REPO_ROOT" "$RUN_DIR")"; then
+if ! RUN_DIR="$(run_utils_resolve_run_dir_for_context "$REPO_ROOT" "$RUN_DIR" "train_logs")"; then
   run_utils_list_runs "$REPO_ROOT" >&2
   exit 1
 fi
@@ -74,19 +80,18 @@ if [[ -z "$log_file" || ! -f "$log_file" ]]; then
   exit 1
 fi
 
-pid_file="${RUN_DIR}/logs/train_job.pid"
-if [[ -f "$pid_file" ]]; then
-  pid="$(cat "$pid_file" 2>/dev/null || true)"
-  if [[ -n "$pid" ]] && ps -p "$pid" >/dev/null 2>&1; then
-    echo "Training process is running (PID $pid)."
-  else
-    echo "No active process for PID in $pid_file."
-  fi
-else
-  echo "No PID file found at $pid_file."
-fi
+"${SCRIPT_DIR}/training_job_status.sh" --run "$RUN_DIR"
 
 echo "Log: $log_file"
+if [[ "$DRY_RUN" -eq 1 ]]; then
+  if [[ "$FOLLOW" -eq 1 ]]; then
+    echo "Dry run: would execute: tail -n $LINES -f $log_file"
+  else
+    echo "Dry run: would execute: tail -n $LINES $log_file"
+  fi
+  exit 0
+fi
+
 if [[ "$FOLLOW" -eq 1 ]]; then
   tail -n "$LINES" -f "$log_file"
 else

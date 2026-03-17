@@ -99,12 +99,45 @@ Jetson constraints to plan around:
 - RGB-D variants if depth enabled.
 - Unity/VR ingestion around `.ply` splats.
 
-## 10. Known friction points
+## 10. Verified status on the current Jetson (2026-03-16)
+What was actually verified on the current Jetson Orin Nano, not just planned:
+
+### RTAB-Map / ROS container path
+- `./scripts/validate_docker_builds.sh --mode cached --target rtabmap` passed.
+- The RTAB-Map image builds and contains `rtabmap_ros`.
+- `ros2 launch rtabmap_launch rtabmap.launch.py --show-args` resolves correctly inside the container.
+- A smoke test launch of RTAB-Map + RGB-D odometry starts successfully in Docker.
+- Current blocker for live mapping is hardware/input readiness, not packaging:
+  - `l4tbr0` existed but was down during audit.
+  - Create 3 was not reachable during the audit.
+  - RTAB-Map warned about missing live topics because no OAK / odom data was actively feeding the graph.
+
+### Gaussian splat training path
+- `./scripts/validate_docker_builds.sh --mode cached --target training` passed.
+- Verified runnable components in the training images include:
+  - `nerfstudio`
+  - `gsplat`
+  - `colmap`
+  - `ns-train`
+- A real public internet dataset test was completed on this Jetson using NVIDIA's `instant-ngp` fox sample.
+- A 500-step `splatfacto` training run completed successfully.
+- Export completed successfully to a `.ply` splat.
+- This confirms the Jetson can handle small practical 3DGS runs.
+
+### Practical hardware conclusion
+- RTAB-Map software stack: validated.
+- RTAB-Map live autonomy stack: not yet proven end-to-end because robot/camera connectivity was absent during testing.
+- Gaussian splats: confirmed working for small datasets and modest iteration counts.
+- Expect Jetson-friendly usage, not workstation-class throughput.
+
+## 11. Known friction points
 - Depth topics may be missing unless enabled.
 - ROS 2 networking discovery issues.
-- VRAM limits during training.
+- VRAM / unified-memory limits during training.
+- Viewer startup can take a while on Jetson because it may cache images and download model weights on first use.
+- Some public `instant-ngp` datasets may emit filename warnings (`.jpg.png`) in Nerfstudio's parser; the run may still succeed despite skipped frames.
 
-## 11. Source files
+## 12. Source files
 - docs/reference/pdfs/Robotics_Tutorials_Packet_TurtleBot4_Duckiebot_GaussianSplatting_v2.pdf
 - docs/reference/pdfs/TurtleBot_4 Course Tutorial and Solution Manual.pdf
 - docs/reference/pdfs/turtlebot4_oakdpro_tutorials_table.pdf
