@@ -45,6 +45,21 @@ def colorize_depth(depth_mm: np.ndarray) -> np.ndarray:
     return cv2.applyColorMap(depth_u8, cv2.COLORMAP_TURBO)
 
 
+def describe_device_info(info: object) -> str:
+    mxid = None
+    if hasattr(info, "getMxId"):
+        try:
+            mxid = info.getMxId()
+        except Exception:
+            mxid = None
+    if mxid is None:
+        mxid = getattr(info, "mxid", None) or getattr(info, "deviceId", None)
+
+    name = getattr(info, "name", None)
+    state = getattr(info, "state", None)
+    return f"mxid={mxid} name={name} state={state}"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="OAK camera health check")
     parser.add_argument(
@@ -80,7 +95,7 @@ def main() -> int:
         return fail("No OAK device found by DepthAI.")
 
     info = devices[0]
-    log(f"[PASS] Device discovered: mxid={info.getMxId()} name={info.name} state={info.state}")
+    log(f"[PASS] Device discovered: {describe_device_info(info)}")
 
     pipeline = dai.Pipeline()
 

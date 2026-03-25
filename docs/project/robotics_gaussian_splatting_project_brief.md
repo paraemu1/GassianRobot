@@ -126,7 +126,7 @@ What was actually verified on the current Jetson Orin Nano, not just planned:
 
 ### Practical hardware conclusion
 - RTAB-Map software stack: validated.
-- RTAB-Map live autonomy stack: not yet proven end-to-end because robot/camera connectivity was absent during testing.
+- RTAB-Map live autonomy stack: validated end-to-end on 2026-03-25 with the split DDS architecture, Create 3 wheel-odom bridge, supervised stop-and-go mission flow, and successful dock / undock closeout.
 - Gaussian splats: confirmed working for small datasets and modest iteration counts.
 - Expect Jetson-friendly usage, not workstation-class throughput.
 

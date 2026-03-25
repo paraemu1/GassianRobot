@@ -14,7 +14,8 @@ TRAIN_IMAGE_TAGS=(
   "gassian/gsplat-train:cuda-colmap"
   "gassian/gsplat-train:jetson-compatible"
 )
-RTABMAP_IMAGE_TAG="${IMAGE_TAG:-gassian/ros2-humble-rtabmap:latest}"
+RTABMAP_IMAGE_TAG="${IMAGE_TAG:-gassian/robot-runtime:latest}"
+RTABMAP_COMPAT_IMAGE_TAG="${COMPAT_IMAGE_TAG:-gassian/ros2-humble-rtabmap:latest}"
 
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -189,19 +190,17 @@ verify_training_image() {
 }
 
 build_rtabmap_image() {
-  local -a cmd=(docker build)
+  local -a cmd=("${SCRIPT_DIR}/build_robot_runtime_image.sh")
 
   if [[ "$MODE" == "clean" ]]; then
     cmd+=(--no-cache --pull)
   fi
 
   if [[ -n "$PROGRESS" ]]; then
-    cmd+=("--progress=${PROGRESS}")
+    cmd+=(--progress "$PROGRESS")
   fi
 
-  cmd+=( -f "${REPO_ROOT}/docker/rtabmap.Dockerfile" -t "$RTABMAP_IMAGE_TAG" "$REPO_ROOT" )
-
-  if run_cmd "${cmd[@]}"; then
+  if run_cmd env IMAGE_TAG="$RTABMAP_IMAGE_TAG" COMPAT_IMAGE_TAG="$RTABMAP_COMPAT_IMAGE_TAG" "${cmd[@]}"; then
     record_pass "rtabmap image build (${MODE})"
     return 0
   fi

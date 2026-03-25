@@ -144,13 +144,16 @@ guided_nav2_start() {
 Guided Nav2 + RTAB-Map startup (non-destructive):
 
 Terminal A:
-  ./scripts/run_rtabmap_container.sh
+  ./scripts/run_robot_runtime_container.sh
   # inside container:
   source /opt/ros/humble/setup.bash
+  # keep this shell open; use separate host shells for the wrappers below
+
+Terminal B (host):
   ./scripts/run_oak_camera.sh
   ./scripts/run_rtabmap_rgbd.sh
 
-Terminal B (host or same ROS environment):
+Terminal C (host):
   ./scripts/run_nav2_with_rtabmap.sh
 
 Then send a goal:
@@ -174,16 +177,17 @@ main_menu() {
       "Pick an action" \
       "1" "Connection report (USB-C / l4tbr0)" \
       "2" "Manual drive app (improved teleop)" \
-      "3" "Legacy arrow-key teleop (fallback)" \
-      "4" "ROS health check" \
-      "5" "Guided Nav2 + scan startup (instructions)" \
-      "6" "Run software readiness audit" \
-      "7" "Run autonomy preflight (software-only)" \
-      "8" "Run autonomous scan mission (dry-run)" \
-      "9" "Launch live auto-scan helper (interactive)" \
-      "10" "Demo checklist" \
-      "11" "Toggle dry-run mode" \
-      "12" "Exit")"
+      "3" "GameCube controller teleop (hidraw adapter)" \
+      "4" "Legacy arrow-key teleop (fallback)" \
+      "5" "ROS health check" \
+      "6" "Guided Nav2 + scan startup (instructions)" \
+      "7" "Run software readiness audit" \
+      "8" "Run autonomy preflight (software-only)" \
+      "9" "Run autonomous scan mission (dry-run)" \
+      "10" "Start live auto-scan (one command)" \
+      "11" "Demo checklist" \
+      "12" "Toggle dry-run mode" \
+      "13" "Exit")"
 
     case "$choice" in
       1)
@@ -193,21 +197,24 @@ main_menu() {
         run_cmd "${SCRIPT_DIR}/teleop_drive_app.sh"
         ;;
       3)
-        run_cmd "${SCRIPT_DIR}/teleop_arrow_keys.sh"
+        run_cmd "${SCRIPT_DIR}/teleop_gamecube_hidraw.sh"
         ;;
       4)
-        run_cmd "${SCRIPT_DIR}/ros_health_check.sh"
+        run_cmd "${SCRIPT_DIR}/teleop_arrow_keys.sh"
         ;;
       5)
-        guided_nav2_start
+        run_cmd "${SCRIPT_DIR}/ros_health_check.sh"
         ;;
       6)
-        run_cmd "${SCRIPT_DIR}/software_readiness_audit.sh"
+        guided_nav2_start
         ;;
       7)
-        run_cmd "${SCRIPT_DIR}/preflight_autonomy.sh"
+        run_cmd "${SCRIPT_DIR}/software_readiness_audit.sh"
         ;;
       8)
+        run_cmd "${SCRIPT_DIR}/preflight_autonomy.sh"
+        ;;
+      9)
         safe_clear
         echo "Running autonomous scan mission in DRY_RUN mode..."
         echo ""
@@ -221,20 +228,20 @@ main_menu() {
         fi
         pause_terminal
         ;;
-      9)
-        run_cmd "${SCRIPT_DIR}/launch_live_auto_scan.sh"
-        ;;
       10)
-        show_demo_help
+        run_cmd "${SCRIPT_DIR}/start_live_auto_scan.sh"
         ;;
       11)
+        show_demo_help
+        ;;
+      12)
         if [[ "$DRY_RUN" == "1" ]]; then
           DRY_RUN=0
         else
           DRY_RUN=1
         fi
         ;;
-      12|"")
+      13|"")
         echo "Bye."
         return 0
         ;;

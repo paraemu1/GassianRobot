@@ -1,6 +1,6 @@
-# Training Docker Setup (Jetson)
+# Runtime + Training Docker Setup (Jetson)
 
-Technical reference for Docker build + validation.
+Technical reference for the repo's two-container layout and lightweight Docker build + validation commands.
 
 If unsure of current directory:
 
@@ -8,7 +8,28 @@ If unsure of current directory:
 cd /home/cam/GassianRobot
 ```
 
-## 1) Build all training images
+## 1) Container split
+
+- Robot runtime container: camera + control + mapping + navigation on the Jetson. Use this for OAK bringup, teleop, RTAB-Map, and Nav2.
+- Training container: Gaussian splat prep, training, export, and viewer workflow.
+
+Preferred runtime entrypoints:
+
+```bash
+./scripts/build_robot_runtime_image.sh
+./scripts/run_robot_runtime_container.sh
+```
+
+Compatibility aliases still supported:
+
+```bash
+./scripts/build_rtabmap_image.sh
+./scripts/run_rtabmap_container.sh
+```
+
+`build_robot_runtime_image.sh` builds `docker/robot_runtime.Dockerfile` as `gassian/robot-runtime:latest` and also applies the legacy compatibility tag `gassian/ros2-humble-rtabmap:latest`.
+
+## 2) Build the training images
 
 ```bash
 ./scripts/build_jetson_training_images.sh
@@ -32,7 +53,9 @@ Image chain built in order:
 3. `gassian/gsplat-train:cuda-colmap`
 4. `gassian/gsplat-train:jetson-compatible`
 
-## 2) Validate builds (recommended)
+The training image flow is unchanged. Keep using these images for Gaussian dataset prep, training jobs, export, and the viewer.
+
+## 3) Validate builds (recommended)
 
 Fast cached validation:
 
@@ -48,7 +71,7 @@ Slow clean validation:
 
 Targets:
 - `training`
-- `rtabmap`
+- `rtabmap` (robot runtime / RTAB-Map image)
 - `all`
 
 Modes:
@@ -57,11 +80,11 @@ Modes:
 
 Validation checks include:
 - Training image: `pip show nerfstudio gsplat`, `colmap -h`, `ns-train --help`
-- RTAB-Map image: `ros2 pkg list | grep rtabmap_ros`
+- Robot runtime image: `ros2 pkg list | grep rtabmap_ros`
 
 Script exits nonzero if any check fails.
 
-## 3) `h5py` / `mpi.h` build failure notes
+## 4) `h5py` / `mpi.h` build failure notes
 
 Previous Jetson failure was:
 
@@ -75,7 +98,7 @@ Current `docker/gsplat_train.Dockerfile` mitigates this by:
 
 If you still see build issues, run clean validation and inspect the failing layer output.
 
-## 4) Training job scripts (long-running workflow)
+## 5) Training job scripts (long-running workflow)
 
 Start:
 
@@ -104,7 +127,7 @@ Stop:
 Run status metadata file:
 - `runs/<run>/logs/train_job.status`
 
-## 5) Context-aware run targeting
+## 6) Context-aware run targeting
 
 `latest` is no longer “blind newest run”.
 
@@ -116,7 +139,7 @@ It is filtered by script context:
 
 This prevents accidental selection of `runs/camera_health` for training.
 
-## 6) TUI coverage
+## 7) TUI coverage
 
 Use full workflow TUI:
 

@@ -5,7 +5,7 @@ set -euo pipefail
 # Movement keys: Up/Down/Left/Right only.
 # Exit: q or Ctrl-C.
 
-IMAGE_TAG="${IMAGE_TAG:-gassian/ros2-humble-rtabmap:latest}"
+IMAGE_TAG="${IMAGE_TAG:-gassian/robot-runtime:latest}"
 RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}"
 ROS_DOMAIN_ID="${ROS_DOMAIN_ID:-0}"
 ROS_LOCALHOST_ONLY="${ROS_LOCALHOST_ONLY:-0}"
@@ -30,7 +30,7 @@ fi
 
 if ! docker image inspect "$IMAGE_TAG" >/dev/null 2>&1; then
   echo "Docker image not found: $IMAGE_TAG" >&2
-  echo "Build it first: ./scripts/build_rtabmap_image.sh" >&2
+  echo "Build it first: ./scripts/build_robot_runtime_image.sh" >&2
   exit 1
 fi
 

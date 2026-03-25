@@ -1,0 +1,23 @@
+/**:
+  ros__parameters:
+    camera:
+      i_nn_type: none
+      i_pipeline_type: RGBD
+    pipeline_gen:
+      i_enable_sync: true
+    rgb:
+      i_fps: 15.0
+      i_max_q_size: 10
+      i_synced: true
+    left:
+      i_fps: 15.0
+      i_max_q_size: 10
+    right:
+      i_fps: 15.0
+      i_max_q_size: 10
+    stereo:
+      i_align_depth: true
+      i_depth_preset: HIGH_ACCURACY
+      i_max_q_size: 10
+      i_synced: true
+      i_subpixel: true

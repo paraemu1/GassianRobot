@@ -1,26 +1,21 @@
-# OpenClaw Web UI over Tailscale (No Auth) — Working Notes
+# OpenClaw Web UI over Tailscale (No Auth)
 
-This document records the setup that **actually worked** on this machine after manual attempts burned a lot of time.
+This note records the setup that actually worked on this machine.
 
-Context:
-- Manual setup attempts were frustrating and time-consuming.
-- Using the **Codex CLI tool** to work through the configuration got OpenClaw working in about an hour.
-- The result is a local-only OpenClaw gateway, exposed to the tailnet with a lightweight reverse proxy, with **no OpenClaw auth** on the Web UI.
+Result:
+- OpenClaw gateway stays local-only on loopback.
+- Tailscale provides tailnet reachability.
+- A lightweight proxy binds to the machine's `100.x` address and forwards to the loopback gateway.
+- The Web UI is reachable on the tailnet without OpenClaw auth.
 
 ## Outcome
-
-Working access pattern:
-- OpenClaw gateway binds **only to loopback** on this machine.
-- Tailscale provides reachability on the tailnet.
-- A tiny Node proxy binds to the machine's `100.x.y.z` Tailscale IP and forwards traffic to the local gateway.
-- The OpenClaw Web UI is reachable on the tailnet **without OpenClaw auth**.
 
 At the time this was documented, the working endpoints were:
 - OpenClaw UI: `http://100.65.59.46:8080/`
 - Viewer proxy example: `http://100.65.59.46:8081/`
 - Local gateway backend: `http://127.0.0.1:18789/`
 
-## Why this pattern worked
+## Working Pattern
 
 Instead of binding the gateway directly to a public or tailnet-facing interface, the working pattern was:
 
@@ -31,7 +26,7 @@ Instead of binding the gateway directly to a public or tailnet-facing interface,
 
 This avoided the confusion of trying to make the gateway itself directly own every network-facing concern.
 
-## Actual OpenClaw config that mattered
+## Actual OpenClaw Config That Mattered
 
 File:
 - `~/.openclaw/openclaw.json`
@@ -64,7 +59,7 @@ Important working fields:
 }
 ```
 
-### Meaning of the important bits
+### Meaning Of The Important Bits
 
 - `"bind": "loopback"`
   - keeps the gateway local-only
@@ -75,13 +70,13 @@ Important working fields:
 - `"allowedOrigins"`
   - must include the origin that the browser will actually use when hitting the Tailscale-facing proxy
 
-## Gateway listener that was working
+## Gateway Listener That Was Working
 
 Observed listener state:
 - `127.0.0.1:18789` → OpenClaw gateway
 - `100.65.59.46:8080` → Tailscale-bound proxy for OpenClaw UI
 
-## Proxy process that made it reachable on Tailscale
+## Proxy Process That Made It Reachable On Tailscale
 
 Proxy script:
 - `~/.local/bin/openclaw-tailscale-proxy.mjs`
@@ -117,7 +112,7 @@ This produced a tailnet-facing endpoint like:
 http://100.65.59.46:8080/
 ```
 
-## Viewer proxy example
+## Viewer Proxy Example
 
 A second proxy instance was used successfully for the Nerfstudio viewer:
 
@@ -139,7 +134,7 @@ http://100.65.59.46:8081/
 
 This exact root URL was re-validated after fixing the viewer relaunch regression on 2026-03-16.
 
-## Important lesson: subpath proxying was a trap
+## Important Lesson: Subpath Proxying Was A Trap
 
 One failed attempt was to mount the viewer under a subpath like:
 
@@ -153,7 +148,7 @@ So the practical rule is:
 - OpenClaw UI can live on its own proxied root
 - Viewer should usually get its **own port at root** rather than a subpath under another app
 
-## Tailscale state that mattered
+## Tailscale State That Mattered
 
 At the time of validation:
 - Tailscale was running
@@ -162,7 +157,7 @@ At the time of validation:
 
 This made the proxy reachable to other devices on the tailnet without exposing the service publicly.
 
-## Security note
+## Security Note
 
 This setup is intentionally convenient, not hardened:
 - OpenClaw auth is disabled
@@ -171,26 +166,12 @@ This setup is intentionally convenient, not hardened:
 
 That may be fine for a trusted personal tailnet, but it is **not** the same as a hardened public deployment.
 
-## Why this should be remembered
+## Why This Should Be Remembered
 
-The key lesson is not just the final config; it is the working architecture:
+The important part is the architecture:
 
 - **loopback-only gateway**
 - **Tailscale for reachability**
-- **tiny proxy for exposure**
-- **allowedOrigins matched to the proxy URL**
-- **no OpenClaw auth for the personal tailnet use case**
-
-That combination worked when direct/manual approaches were confusing and easy to get wrong.
-
-## Suggested future improvements
-
-If this setup remains valuable, consider later:
-- turning the proxy launch into a user service
-- documenting restart commands explicitly
-- optionally re-enabling auth if the threat model changes
-- documenting the Codex CLI workflow used to converge on the final config, if command history is available
-le for reachability**
 - **tiny proxy for exposure**
 - **allowedOrigins matched to the proxy URL**
 - **no OpenClaw auth for the personal tailnet use case**

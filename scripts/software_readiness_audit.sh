@@ -39,11 +39,21 @@ else
   f "docker daemon not reachable"
 fi
 
-for img in gassian/ros2-humble-rtabmap:latest gassian/gsplat-train:latest; do
+for img in gassian/robot-runtime:latest gassian/ros2-humble-rtabmap:latest gassian/gsplat-train:latest; do
   if docker image inspect "$img" >/dev/null 2>&1; then p "docker image present: $img"; else w "docker image missing: $img"; fi
 done
 
-for s in scripts/control_center.sh scripts/teleop_drive_app.sh scripts/teleop_drive_app.py scripts/run_nav2_with_rtabmap.sh scripts/run_rtabmap_rgbd.sh scripts/send_nav2_goal.sh scripts/run_auto_scan_mission.sh; do
+for s in \
+  scripts/control_center.sh \
+  scripts/teleop_drive_app.sh \
+  scripts/teleop_drive_app.py \
+  scripts/run_robot_runtime_container.sh \
+  scripts/run_create3_cmd_vel_bridge.sh \
+  scripts/create3_base_health_check.sh \
+  scripts/run_nav2_with_rtabmap.sh \
+  scripts/run_rtabmap_rgbd.sh \
+  scripts/send_nav2_goal.sh \
+  scripts/run_auto_scan_mission.sh; do
   if [[ -f "$REPO_ROOT/$s" ]]; then p "file exists: $s"; else f "missing file: $s"; fi
 done
 

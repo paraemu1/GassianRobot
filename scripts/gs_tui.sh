@@ -608,7 +608,7 @@ do_validate_training_clean() {
 }
 
 do_build_rtabmap_image() {
-  local cmd=("${SCRIPT_DIR}/build_rtabmap_image.sh")
+  local cmd=("${SCRIPT_DIR}/build_robot_runtime_image.sh")
   if [[ "$SAFE_MODE" == "1" ]]; then
     preview_command "${cmd[@]}"
     return 0
@@ -634,7 +634,7 @@ run_robot_or_preview() {
 }
 
 do_run_rtabmap_container() {
-  run_robot_or_preview "${SCRIPT_DIR}/run_rtabmap_container.sh"
+  run_robot_or_preview "${SCRIPT_DIR}/run_robot_runtime_container.sh"
 }
 
 do_run_oak_ros_camera() {
