@@ -10,10 +10,10 @@ This note records what was actually validated on the current Jetson, so future w
 ## RTAB-Map / autonomy
 
 ### Verified
-- `./scripts/software_readiness_audit.sh` passed with no hard failures.
+- `./scripts/build/software_readiness_audit.sh` passed with no hard failures.
 - Docker daemon reachable.
 - RTAB-Map image present: `gassian/ros2-humble-rtabmap:latest`
-- `./scripts/validate_docker_builds.sh --mode cached --target rtabmap` passed.
+- `./scripts/build/validate_docker_builds.sh --mode cached --target rtabmap` passed.
 - RTAB-Map launch package resolved successfully.
 - RTAB-Map + RGB-D odometry smoke test launched successfully inside Docker.
 
@@ -31,7 +31,7 @@ This note records what was actually validated on the current Jetson, so future w
 ## Gaussian splats
 
 ### Verified
-- `./scripts/validate_docker_builds.sh --mode cached --target training` passed.
+- `./scripts/build/validate_docker_builds.sh --mode cached --target training` passed.
 - Training image chain built successfully:
   - `gassian/gsplat-train:latest`
   - `gassian/gsplat-train:colmap`
@@ -63,7 +63,7 @@ That broken launch path failed with:
 - `RuntimeError: CUDA driver version is insufficient for CUDA runtime version`
 
 The reliable launch pattern on this Jetson is:
-- use `./scripts/start_gaussian_viewer.sh ...`
+- use `./scripts/gaussian/start_gaussian_viewer.sh ...`
 - which in turn uses:
   - `--runtime nvidia`
   - `--network host`

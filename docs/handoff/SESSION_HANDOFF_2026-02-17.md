@@ -7,11 +7,11 @@ Note (updated 2026-02-24): this handoff remains historical context. Any referenc
 ## What was added
 
 ### Scripts
-- `scripts/ros_health_check.sh`
-- `scripts/init_run_dir.sh`
-- `scripts/process_train_export.sh` (extended for Docker + run-env + dataset modes)
-- `scripts/build_jetson_training_images.sh`
-- `scripts/prepare_gs_input_from_run.sh`
+- `scripts/robot/ros_health_check.sh`
+- `scripts/run_tools/init_run_dir.sh`
+- `scripts/gaussian/process_train_export.sh` (extended for Docker + run-env + dataset modes)
+- `scripts/build/build_jetson_training_images.sh`
+- `scripts/gaussian/prepare_gs_input_from_run.sh`
 
 ### Docker
 - `docker/gsplat_train.Dockerfile`
@@ -48,10 +48,10 @@ Note (updated 2026-02-24): this handoff remains historical context. Any referenc
 ## Canonical next commands
 ```bash
 chmod +x scripts/*.sh
-./scripts/build_jetson_training_images.sh
-./scripts/init_run_dir.sh lab_loop_a
-./scripts/prepare_gs_input_from_run.sh --run runs/$(date +%F)-lab_loop_a
-./scripts/process_train_export.sh --run runs/$(date +%F)-lab_loop_a --from-run-env --downscale 2
+./scripts/build/build_jetson_training_images.sh
+./scripts/run_tools/init_run_dir.sh lab_loop_a
+./scripts/gaussian/prepare_gs_input_from_run.sh --run runs/$(date +%F)-lab_loop_a
+./scripts/gaussian/process_train_export.sh --run runs/$(date +%F)-lab_loop_a --from-run-env --downscale 2
 ```
 
 ## Source-of-truth docs for this flow

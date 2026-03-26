@@ -4,78 +4,111 @@ Use this folder for executable entrypoints. Most day-to-day work should start fr
 
 ## Main Menus
 
+- Root `scripts/` now keeps only the TUI entrypoints.
 - `./scripts/easy_autonomy_tui.sh`: ncurses-first operator menu for the validated scan flow
 - `./scripts/gs_tui.sh`: primary Gaussian capture/train/view workflow
 - `./scripts/control_center.sh`: advanced Create 3 control, teleop, ROS checks, and guided bringup notes
 - `./scripts/master_tui.sh`: thin top-level launcher that points operators toward the easy scan menu first
-- `./scripts/teleop_gamecube_hidraw.sh`: GameCube controller teleop for a Mayflash/Nintendo adapter exposed as `/dev/hidraw*`
+- `./scripts/gs_tui_legacy.sh`: fallback plain/whiptail Gaussian TUI
+- `./scripts/gs_ncurses_tui.py`: ncurses Gaussian TUI implementation
+
+## What Each TUI Does
+
+- `./scripts/master_tui.sh`
+  Top-level launcher. Use this if you are not sure where to start. It sends you to the easy robot scan menu, the advanced robot tools, or the Gaussian workflow menu.
+- `./scripts/easy_autonomy_tui.sh`
+  Beginner-friendly robot operator menu. Use this for normal scan sessions. It keeps the common flow simple: health check, prepare the scan stack, start the mission, dock or undock, check status, and review previous scan runs.
+- `./scripts/control_center.sh`
+  Advanced robot menu. Use this when you need manual control or lower-level checks instead of the simplified scan workflow. It exposes teleop, ROS health checks, autonomy preflight, and readiness/audit tools.
+- `./scripts/gs_tui.sh`
+  Main entrypoint for Gaussian splatting work. Use this for run preparation, training, viewer control, run inspection, and build or diagnostic tasks related to the Gaussian pipeline. It decides whether to launch the ncurses UI or the legacy shell UI.
+- `./scripts/gs_ncurses_tui.py`
+  Ncurses implementation behind `gs_tui.sh`. This is the full-screen keyboard-driven Gaussian menu shown in a real terminal. Most users should launch `gs_tui.sh` instead of calling this directly.
+- `./scripts/gs_tui_legacy.sh`
+  Fallback shell/whiptail Gaussian menu. This exists for non-interactive shells, environments where the ncurses UI is not suitable, and self-test automation. It is useful for debugging, but it is not the preferred day-to-day entrypoint.
+
+## Which One To Use
+
+- New robot operator: `./scripts/easy_autonomy_tui.sh`
+- Someone who wants one launcher first: `./scripts/master_tui.sh`
+- Advanced robot debugging or manual driving: `./scripts/control_center.sh`
+- Gaussian capture, training, and viewer workflow: `./scripts/gs_tui.sh`
+
+## Directory Layout
+
+- `scripts/lib/`: shared shell helpers used by the TUIs and runtime wrappers
+- `scripts/build/`: Docker build and validation entrypoints
+- `scripts/gaussian/`: Gaussian capture, prep, train, and viewer lifecycle scripts
+- `scripts/robot/`: robot runtime, autonomy, teleop, health checks, and mission scripts
+- `scripts/run_tools/`: run creation, listing, delete/restore, and trash management
+- `scripts/tests/`: non-destructive script and TUI smoke tests
 
 ## Gaussian Workflow
 
 - Capture and prep:
-  - `manual_handheld_oak_capture_test.sh`
-  - `prepare_gs_input_from_run.sh`
-  - `run_handheld_prep_or_train.sh`
+  - `scripts/gaussian/manual_handheld_oak_capture_test.sh`
+  - `scripts/gaussian/prepare_gs_input_from_run.sh`
+  - `scripts/gaussian/run_handheld_prep_or_train.sh`
 - Training lifecycle:
-  - `start_gaussian_training_job.sh`
-  - `training_job_status.sh`
-  - `watch_gaussian_training_job.sh`
-  - `stop_gaussian_training_job.sh`
-  - `cleanup_stale_training_state.sh`
+  - `scripts/gaussian/start_gaussian_training_job.sh`
+  - `scripts/gaussian/training_job_status.sh`
+  - `scripts/gaussian/watch_gaussian_training_job.sh`
+  - `scripts/gaussian/stop_gaussian_training_job.sh`
+  - `scripts/gaussian/cleanup_stale_training_state.sh`
 - Viewer lifecycle:
-  - `start_gaussian_viewer.sh`
-  - `stop_gaussian_viewer.sh`
+  - `scripts/gaussian/start_gaussian_viewer.sh`
+  - `scripts/gaussian/stop_gaussian_viewer.sh`
 - End-to-end helper:
-  - `process_train_export.sh`
+  - `scripts/gaussian/process_train_export.sh`
 
 ## Robot / Mapping Workflow
 
 - Preferred unified robot-runtime entrypoints:
-  - `build_robot_runtime_image.sh`
-  - `run_robot_runtime_container.sh`
+  - `scripts/build/build_robot_runtime_image.sh`
+  - `scripts/robot/run_robot_runtime_container.sh`
 - Container and launch helpers inside/against that runtime:
-  - `run_rtabmap_container.sh` (compatibility alias / lower-level launcher)
-  - `run_create3_cmd_vel_bridge.sh`
-  - `run_oak_camera.sh`
-  - `run_rtabmap_rgbd.sh`
-  - `run_nav2_with_rtabmap.sh`
+  - `scripts/robot/run_rtabmap_container.sh` (compatibility alias / lower-level launcher)
+  - `scripts/robot/run_create3_cmd_vel_bridge.sh`
+  - `scripts/robot/run_oak_camera.sh`
+  - `scripts/robot/run_rtabmap_rgbd.sh`
+  - `scripts/robot/run_nav2_with_rtabmap.sh`
 - Checks and audits:
-  - `create3_base_health_check.sh`
-  - `create3_motion_ready_check.sh`
-  - `ros_health_check.sh`
-  - `check_rtabmap_sync.sh`
-  - `software_readiness_audit.sh`
-  - `preflight_autonomy.sh`
+  - `scripts/robot/create3_base_health_check.sh`
+  - `scripts/robot/create3_motion_ready_check.sh`
+  - `scripts/robot/ros_health_check.sh`
+  - `scripts/robot/check_rtabmap_sync.sh`
+  - `scripts/build/software_readiness_audit.sh`
+  - `scripts/robot/preflight_autonomy.sh`
 - Teleop and missions:
-  - `teleop_drive_app.sh`
-  - `teleop_gamecube_hidraw.sh`
-  - `teleop_arrow_keys.sh`
-  - `teleop_keyboard.sh`
-  - `send_nav2_goal.sh`
-  - `run_auto_scan_mission.sh`
-  - `launch_live_auto_scan.sh`
-  - `start_live_auto_scan.sh` (compatibility wrapper)
-  - `stop_live_auto_scan.sh` (compatibility wrapper)
-  - `status_live_auto_scan.sh` (compatibility wrapper)
-  - `create3_dock_control.sh`
-  - `generate_live_scan_waypoints.py`
+  - `scripts/robot/teleop_drive_app.sh`
+  - `scripts/robot/teleop_gamecube_hidraw.sh`
+  - `scripts/robot/teleop_arrow_keys.sh`
+  - `scripts/robot/teleop_keyboard.sh`
+  - `scripts/robot/send_nav2_goal.sh`
+  - `scripts/robot/run_auto_scan_mission.sh`
+  - `scripts/robot/launch_live_auto_scan.sh`
+  - `scripts/robot/start_live_auto_scan.sh` (compatibility wrapper)
+  - `scripts/robot/stop_live_auto_scan.sh` (compatibility wrapper)
+  - `scripts/robot/status_live_auto_scan.sh` (compatibility wrapper)
+  - `scripts/robot/create3_dock_control.sh`
+  - `scripts/robot/generate_live_scan_waypoints.py`
 
 ## Run Management
 
-- `init_run_dir.sh`
-- `list_runs.sh`
-- `delete_run.sh`
-- `restore_run.sh`
-- `purge_run_trash.sh`
+- `scripts/run_tools/init_run_dir.sh`
+- `scripts/run_tools/list_runs.sh`
+- `scripts/run_tools/delete_run.sh`
+- `scripts/run_tools/restore_run.sh`
+- `scripts/run_tools/purge_run_trash.sh`
 
 ## Build / Validation
 
-- `build_jetson_training_images.sh`
-- `build_robot_runtime_image.sh`
-- `build_rtabmap_image.sh` (compatibility alias to the robot runtime image build)
-- `validate_docker_builds.sh`
-- `test_gs_tui.sh`
-- `test_operator_tuis.sh`
+- `scripts/build/build_jetson_training_images.sh`
+- `scripts/build/build_robot_runtime_image.sh`
+- `scripts/build/build_rtabmap_image.sh` (compatibility alias to the robot runtime image build)
+- `scripts/build/validate_docker_builds.sh`
+- `scripts/tests/test_gs_tui.sh`
+- `scripts/tests/test_operator_tuis.sh`
 
 ## Notes
 
@@ -89,7 +122,7 @@ Use this folder for executable entrypoints. Most day-to-day work should start fr
 - `run_rtabmap_container.sh` remains available as a compatibility/lower-level launcher for the same runtime path.
 - `run_oak_camera.sh`, `record_raw_bag.sh`, `check_rtabmap_sync.sh`, `run_rtabmap_rgbd.sh`, `run_nav2_with_rtabmap.sh`, and `send_nav2_goal.sh` can be launched from the host and will prefer the running robot runtime container by default.
 - `check_rtabmap_sync.sh` now covers both live timestamp deltas and TF readiness for `odom <- base_link`; set `CHECK_MAP_ODOM_TF=1` after RTAB-Map starts if you also want `map <- odom` checked in the same pass.
-- The preferred full autonomous scan entrypoint is `./scripts/launch_live_auto_scan.sh start`. It starts Docker if needed, starts the runtime container, both Create 3 bridges, OAK, RTAB-Map, Nav2, saves the RTAB-Map database into the run directory, auto-undocks, runs the stop-and-go mission, stops the stack, and then re-docks on a successful mission.
+- The preferred full autonomous scan entrypoint is `./scripts/robot/launch_live_auto_scan.sh start`. It starts Docker if needed, starts the runtime container, both Create 3 bridges, OAK, RTAB-Map, Nav2, saves the RTAB-Map database into the run directory, auto-undocks, runs the stop-and-go mission, stops the stack, and then re-docks on a successful mission.
 - `launch_live_auto_scan.sh start-only` brings the stack up without motion, `launch_live_auto_scan.sh mission` runs only the mission/closeout on an already-running stack, and `launch_live_auto_scan.sh stop|status` handle shutdown and inspection.
 - `easy_autonomy_tui.sh` is the simplest operator-facing entrypoint. It now prefers an ncurses menu via `whiptail`, remembers the last run name for the two-step `start-only` then `mission` flow, and exposes only the common actions needed for a supervised scan session.
 - `control_center.sh` has been pruned down to advanced/manual tools only; the older duplicated scan actions were removed so operators are funneled into `easy_autonomy_tui.sh`.

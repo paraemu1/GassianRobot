@@ -103,7 +103,7 @@ Jetson constraints to plan around:
 What was actually verified on the current Jetson Orin Nano, not just planned:
 
 ### RTAB-Map / ROS container path
-- `./scripts/validate_docker_builds.sh --mode cached --target rtabmap` passed.
+- `./scripts/build/validate_docker_builds.sh --mode cached --target rtabmap` passed.
 - The RTAB-Map image builds and contains `rtabmap_ros`.
 - `ros2 launch rtabmap_launch rtabmap.launch.py --show-args` resolves correctly inside the container.
 - A smoke test launch of RTAB-Map + RGB-D odometry starts successfully in Docker.
@@ -113,7 +113,7 @@ What was actually verified on the current Jetson Orin Nano, not just planned:
   - RTAB-Map warned about missing live topics because no OAK / odom data was actively feeding the graph.
 
 ### Gaussian splat training path
-- `./scripts/validate_docker_builds.sh --mode cached --target training` passed.
+- `./scripts/build/validate_docker_builds.sh --mode cached --target training` passed.
 - Verified runnable components in the training images include:
   - `nerfstudio`
   - `gsplat`

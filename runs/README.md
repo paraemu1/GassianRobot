@@ -7,7 +7,7 @@ Each capture or training attempt should live under:
 Create one with:
 
 ```bash
-./scripts/init_run_dir.sh scene_name
+./scripts/run_tools/init_run_dir.sh scene_name
 ```
 
 ## Standard Layout
@@ -29,5 +29,5 @@ Create one with:
 
 ## Operational Notes
 
-- Soft delete moves runs into `runs/.trash/`; use `./scripts/delete_run.sh` and `./scripts/restore_run.sh` instead of removing directories manually.
+- Soft delete moves runs into `runs/.trash/`; use `./scripts/run_tools/delete_run.sh` and `./scripts/run_tools/restore_run.sh` instead of removing directories manually.
 - Training and viewer scripts may use context-aware `latest`, but trainability/viewer readiness still depends on the expected files being present.

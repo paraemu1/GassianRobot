@@ -9,7 +9,7 @@ Use this when you want robot navigation/pathfinding, not just mapping.
 From the host:
 
 ```bash
-./scripts/run_robot_runtime_container.sh
+./scripts/robot/run_robot_runtime_container.sh
 ```
 
 This now starts the local autonomy graph by default:
@@ -22,11 +22,11 @@ This now starts the local autonomy graph by default:
 From separate host shells:
 
 ```bash
-./scripts/run_create3_cmd_vel_bridge.sh start
-./scripts/run_create3_odom_bridge.sh start
-./scripts/run_oak_camera.sh
-./scripts/run_rtabmap_rgbd.sh
-./scripts/check_rtabmap_sync.sh
+./scripts/robot/run_create3_cmd_vel_bridge.sh start
+./scripts/robot/run_create3_odom_bridge.sh start
+./scripts/robot/run_oak_camera.sh
+./scripts/robot/run_rtabmap_rgbd.sh
+./scripts/robot/check_rtabmap_sync.sh
 ```
 
 RTAB-Map should provide:
@@ -43,20 +43,20 @@ Safety:
 Optional combined check after RTAB-Map is running:
 
 ```bash
-CHECK_MAP_ODOM_TF=1 ./scripts/check_rtabmap_sync.sh
+CHECK_MAP_ODOM_TF=1 ./scripts/robot/check_rtabmap_sync.sh
 ```
 
 ## 3) In another shell, start Nav2
 
 ```bash
-./scripts/run_nav2_with_rtabmap.sh
+./scripts/robot/run_nav2_with_rtabmap.sh
 ```
 
 ## 4) Preflight checks required before goals
 
 ```bash
-./scripts/create3_base_health_check.sh
-NEED_ROBOT=1 ./scripts/preflight_autonomy.sh
+./scripts/robot/create3_base_health_check.sh
+NEED_ROBOT=1 ./scripts/robot/preflight_autonomy.sh
 docker exec ros_humble_robot_runtime bash -lc 'source /opt/ros/humble/setup.bash && ros2 topic list | grep -E "^/map$|^/rtabmap/map$|^/odom$"'
 docker exec ros_humble_robot_runtime bash -lc 'source /opt/ros/humble/setup.bash && ros2 run tf2_ros tf2_echo odom base_link'
 docker exec ros_humble_robot_runtime bash -lc 'source /opt/ros/humble/setup.bash && ros2 run tf2_ros tf2_echo map odom'
@@ -71,7 +71,7 @@ If `tf2_echo` times out, Nav2 cannot activate controllers yet.
 Inside a third shell:
 
 ```bash
-./scripts/send_nav2_goal.sh 1.0 0.0 0.0 1.0
+./scripts/robot/send_nav2_goal.sh 1.0 0.0 0.0 1.0
 ```
 
 Planning-only check:
@@ -97,9 +97,9 @@ docker exec ros_humble_robot_runtime bash -lc 'source /opt/ros/humble/setup.bash
   `config/nav2_rtabmap_params.yaml`
 - The wrapper scripts default to the unified runtime container name `ros_humble_robot_runtime`, so a fresh host shell can still exec into the live container without manual `ROS_CONTAINER=...` exports.
 - `send_nav2_goal.sh` now defaults to the local autonomy graph and prefers the running runtime container instead of falling back to the robot DDS graph.
-- The preferred full-floor-run entrypoint is `./scripts/launch_live_auto_scan.sh start` or the split `start-only` + `mission` flow.
+- The preferred full-floor-run entrypoint is `./scripts/robot/launch_live_auto_scan.sh start` or the split `start-only` + `mission` flow.
 - Override params file if needed:
 
 ```bash
-PARAMS_FILE=/path/to/nav2_params.yaml ./scripts/run_nav2_with_rtabmap.sh
+PARAMS_FILE=/path/to/nav2_params.yaml ./scripts/robot/run_nav2_with_rtabmap.sh
 ```

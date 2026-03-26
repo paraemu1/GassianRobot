@@ -7,8 +7,8 @@ TUI_FORCE_PLAIN="${MASTER_TUI_FORCE_PLAIN:-${GASSIAN_TUI_FORCE_PLAIN:-0}}"
 TUI_USE_WHIPTAIL="${MASTER_TUI_USE_WHIPTAIL:-${GASSIAN_TUI_USE_WHIPTAIL:-1}}"
 TUI_AUTOTEST="${MASTER_TUI_AUTOTEST:-${GASSIAN_TUI_AUTOTEST:-0}}"
 
-# shellcheck source=./_tui_common.sh
-source "${SCRIPT_DIR}/_tui_common.sh"
+# shellcheck source=./lib/_tui_common.sh
+source "${SCRIPT_DIR}/lib/_tui_common.sh"
 tui_init
 
 show_banner() {
@@ -71,7 +71,7 @@ main_menu() {
       1) open_easy_menu ;;
       2) open_control_center ;;
       3) open_gaussian_menu ;;
-      4) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/software_readiness_audit.sh" ;;
+      4) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/build/software_readiness_audit.sh" ;;
       5)
         if [[ "$DRY_RUN" == "1" ]]; then
           DRY_RUN=0

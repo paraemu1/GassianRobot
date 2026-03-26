@@ -15,10 +15,10 @@ Purpose: bring up the current validated Create 3 + OAK + RTAB-Map + Nav2 stack, 
   - `DDS_IFACE=l4tbr0`
   - Create 3 base services and status topics live here.
 - Bridges:
-  - `./scripts/run_create3_cmd_vel_bridge.sh`
-  - `./scripts/run_create3_odom_bridge.sh`
+  - `./scripts/robot/run_create3_cmd_vel_bridge.sh`
+  - `./scripts/robot/run_create3_odom_bridge.sh`
 - Preferred launcher:
-  - `./scripts/launch_live_auto_scan.sh`
+  - `./scripts/robot/launch_live_auto_scan.sh`
 
 Important behavior of the current mission flow:
 
@@ -53,12 +53,12 @@ From the Jetson shell:
 cd /home/cam/GassianRobot
 chmod +x scripts/*.sh
 docker info >/dev/null 2>&1 || sudo systemctl start docker
-docker image inspect gassian/robot-runtime:latest >/dev/null 2>&1 || ./scripts/build_robot_runtime_image.sh
+docker image inspect gassian/robot-runtime:latest >/dev/null 2>&1 || ./scripts/build/build_robot_runtime_image.sh
 ip addr show l4tbr0
 ping -I l4tbr0 -c 2 192.168.186.2
 curl --interface l4tbr0 -I http://192.168.186.2/
-./scripts/create3_base_health_check.sh
-./scripts/create3_dock_control.sh status
+./scripts/robot/create3_base_health_check.sh
+./scripts/robot/create3_dock_control.sh status
 ```
 
 Optional robot log check if the base looks unstable:
@@ -83,7 +83,7 @@ Preferred entrypoint:
 
 ```bash
 cd /home/cam/GassianRobot
-RUN_NAME="$(date +%F-%H%M)-live-auto-scan" ./scripts/launch_live_auto_scan.sh start-only
+RUN_NAME="$(date +%F-%H%M)-live-auto-scan" ./scripts/robot/launch_live_auto_scan.sh start-only
 ```
 
 This brings up:
@@ -98,7 +98,7 @@ This brings up:
 Quick verification:
 
 ```bash
-./scripts/launch_live_auto_scan.sh status
+./scripts/robot/launch_live_auto_scan.sh status
 docker exec ros_humble_robot_runtime bash -lc \
   'source /opt/ros/humble/setup.bash && ros2 action list | grep -Fx /navigate_to_pose'
 ```
@@ -113,7 +113,7 @@ Expected result:
 
 ```bash
 cd /home/cam/GassianRobot
-NEED_ROBOT=1 ./scripts/preflight_autonomy.sh
+NEED_ROBOT=1 ./scripts/robot/preflight_autonomy.sh
 ```
 
 Notes:
@@ -125,7 +125,7 @@ Notes:
 
 ```bash
 cd /home/cam/GassianRobot
-RUN_NAME="<same-run-name>" ./scripts/launch_live_auto_scan.sh mission
+RUN_NAME="<same-run-name>" ./scripts/robot/launch_live_auto_scan.sh mission
 ```
 
 The current launcher behavior is:
@@ -153,20 +153,20 @@ If you need direct dock control outside the full launcher:
 
 ```bash
 cd /home/cam/GassianRobot
-./scripts/create3_dock_control.sh status
-./scripts/create3_dock_control.sh undock
-./scripts/create3_dock_control.sh dock
+./scripts/robot/create3_dock_control.sh status
+./scripts/robot/create3_dock_control.sh undock
+./scripts/robot/create3_dock_control.sh dock
 ```
 
 ## Acceptance criteria
 
 The stack is ready for a supervised live floor run only if all of these are true in the same session:
 
-1. `./scripts/create3_base_health_check.sh` passes.
-2. `./scripts/launch_live_auto_scan.sh start-only` completes.
-3. `./scripts/launch_live_auto_scan.sh status` shows the runtime and both bridges up.
+1. `./scripts/robot/create3_base_health_check.sh` passes.
+2. `./scripts/robot/launch_live_auto_scan.sh start-only` completes.
+3. `./scripts/robot/launch_live_auto_scan.sh status` shows the runtime and both bridges up.
 4. `/navigate_to_pose` exists in the runtime container.
-5. `NEED_ROBOT=1 ./scripts/preflight_autonomy.sh` passes.
+5. `NEED_ROBOT=1 ./scripts/robot/preflight_autonomy.sh` passes.
 6. The mission completes without Nav2 recovery loops or RTAB-Map odometry collapse.
 7. If the robot encounters a ledge / obstacle boundary, it backtracks instead of continuing to push into it.
 8. The robot stops cleanly and re-docks at the end of a successful run.

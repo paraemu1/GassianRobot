@@ -9,8 +9,10 @@ TUI_FORCE_PLAIN="${EASY_AUTONOMY_TUI_FORCE_PLAIN:-${GASSIAN_TUI_FORCE_PLAIN:-0}}
 TUI_USE_WHIPTAIL="${EASY_AUTONOMY_TUI_USE_WHIPTAIL:-${GASSIAN_TUI_USE_WHIPTAIL:-1}}"
 TUI_AUTOTEST="${EASY_AUTONOMY_TUI_AUTOTEST:-${GASSIAN_TUI_AUTOTEST:-0}}"
 
-# shellcheck source=./_tui_common.sh
-source "${SCRIPT_DIR}/_tui_common.sh"
+# shellcheck source=./lib/_tui_common.sh
+source "${SCRIPT_DIR}/lib/_tui_common.sh"
+# shellcheck source=./lib/_run_utils.sh
+source "${SCRIPT_DIR}/lib/_run_utils.sh"
 tui_init
 
 default_run_name() {
@@ -66,15 +68,45 @@ status_report() {
   echo "Last run:  $(current_run_label)"
   echo ""
   echo "--- Dock status ---"
-  bash "${SCRIPT_DIR}/create3_dock_control.sh" status || true
+  bash "${SCRIPT_DIR}/robot/create3_dock_control.sh" status || true
   echo ""
   echo "--- Scan stack status ---"
-  "${SCRIPT_DIR}/launch_live_auto_scan.sh" status || true
+  "${SCRIPT_DIR}/robot/launch_live_auto_scan.sh" status || true
   tui_pause
 }
 
+show_scan_history() {
+  local remembered_run
+  local count=0
+  local content
+  local line run_dir mode result has_db has_waypoints rel suffix
+
+  remembered_run="$(current_run_label)"
+  content="Recorded scan runs (newest first)\n\n"
+
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    IFS='|' read -r run_dir mode result has_db has_waypoints <<< "$line"
+    rel="${run_dir#${REPO_ROOT}/}"
+    suffix=""
+    if [[ "$(basename "$run_dir")" == "$remembered_run" ]]; then
+      suffix=" [last prepared run]"
+    fi
+    count=$((count + 1))
+    content+="${count}. ${rel}${suffix} | ${mode} | ${result} | rtabmap_db=${has_db} | waypoints=${has_waypoints}\n"
+  done < <(run_utils_scan_history_lines "$REPO_ROOT")
+
+  if [[ "$count" -eq 0 ]]; then
+    content+="No scan runs were found yet.\n\nA run appears here after a scan mission creates logs/auto_scan_mission.log."
+  else
+    content+="\nTotal scan runs: ${count}"
+  fi
+
+  tui_show_text "Previous Scan Runs" "$content"
+}
+
 base_check() {
-  tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/create3_base_health_check.sh"
+  tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/robot/create3_base_health_check.sh"
 }
 
 full_scan_now() {
@@ -83,7 +115,7 @@ full_scan_now() {
   if ! scan_safety_prompt; then
     return 0
   fi
-  run_with_run_name "$run_name" "${SCRIPT_DIR}/launch_live_auto_scan.sh" start
+  run_with_run_name "$run_name" "${SCRIPT_DIR}/robot/launch_live_auto_scan.sh" start
 }
 
 bring_up_only() {
@@ -92,7 +124,7 @@ bring_up_only() {
   if ! scan_safety_prompt; then
     return 0
   fi
-  run_with_run_name "$run_name" "${SCRIPT_DIR}/launch_live_auto_scan.sh" start-only
+  run_with_run_name "$run_name" "${SCRIPT_DIR}/robot/launch_live_auto_scan.sh" start-only
 }
 
 start_mission_only() {
@@ -106,18 +138,18 @@ start_mission_only() {
   if ! scan_safety_prompt; then
     return 0
   fi
-  run_with_run_name "$run_name" "${SCRIPT_DIR}/launch_live_auto_scan.sh" mission
+  run_with_run_name "$run_name" "${SCRIPT_DIR}/robot/launch_live_auto_scan.sh" mission
 }
 
 dock_robot() {
-  tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/create3_dock_control.sh" dock
+  tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/robot/create3_dock_control.sh" dock
 }
 
 undock_robot() {
   if ! tui_confirm "Undock the robot now?\n\nMake sure the floor area ahead of the dock is clear." "Undock Robot"; then
     return 0
   fi
-  tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/create3_dock_control.sh" undock
+  tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/robot/create3_dock_control.sh" undock
 }
 
 open_advanced_menu() {
@@ -146,14 +178,15 @@ main_menu() {
       "2" "Prepare Scan Stack Without Motion" \
       "3" "Start Prepared Mission" \
       "4" "Show Robot + Scan Status" \
-      "5" "Run Robot Health Check" \
-      "6" "Dock Robot" \
-      "7" "Undock Robot" \
-      "8" "Manual Drive Control" \
-      "9" "Open Advanced Robot Tools" \
-      "10" "Show Quick Guide" \
-      "11" "Toggle dry-run mode" \
-      "12" "Exit")"; then
+      "5" "List Previous Scan Runs" \
+      "6" "Run Robot Health Check" \
+      "7" "Dock Robot" \
+      "8" "Undock Robot" \
+      "9" "Manual Drive Control" \
+      "10" "Open Advanced Robot Tools" \
+      "11" "Show Quick Guide" \
+      "12" "Toggle dry-run mode" \
+      "13" "Exit")"; then
       echo "Bye."
       return 0
     fi
@@ -163,20 +196,21 @@ main_menu() {
       2) bring_up_only ;;
       3) start_mission_only ;;
       4) status_report ;;
-      5) base_check ;;
-      6) dock_robot ;;
-      7) undock_robot ;;
-      8) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/teleop_drive_app.sh" ;;
-      9) open_advanced_menu ;;
-      10) show_operator_intro ;;
-      11)
+      5) show_scan_history ;;
+      6) base_check ;;
+      7) dock_robot ;;
+      8) undock_robot ;;
+      9) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/robot/teleop_drive_app.sh" ;;
+      10) open_advanced_menu ;;
+      11) show_operator_intro ;;
+      12)
         if [[ "$DRY_RUN" == "1" ]]; then
           DRY_RUN=0
         else
           DRY_RUN=1
         fi
         ;;
-      12)
+      13)
         echo "Bye."
         return 0
         ;;

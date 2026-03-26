@@ -8,8 +8,8 @@ TUI_FORCE_PLAIN="${CONTROL_TUI_FORCE_PLAIN:-${GASSIAN_TUI_FORCE_PLAIN:-0}}"
 TUI_USE_WHIPTAIL="${CONTROL_TUI_USE_WHIPTAIL:-${GASSIAN_TUI_USE_WHIPTAIL:-1}}"
 TUI_AUTOTEST="${CONTROL_TUI_AUTOTEST:-${GASSIAN_TUI_AUTOTEST:-0}}"
 
-# shellcheck source=./_tui_common.sh
-source "${SCRIPT_DIR}/_tui_common.sh"
+# shellcheck source=./lib/_tui_common.sh
+source "${SCRIPT_DIR}/lib/_tui_common.sh"
 tui_init
 
 connection_report() {
@@ -61,20 +61,20 @@ guided_nav2_start() {
 Guided Nav2 + RTAB-Map startup (non-destructive):
 
 Terminal A:
-  ./scripts/run_robot_runtime_container.sh
+  ./scripts/robot/run_robot_runtime_container.sh
   # inside container:
   source /opt/ros/humble/setup.bash
   # keep this shell open; use separate host shells for the wrappers below
 
 Terminal B (host):
-  ./scripts/run_oak_camera.sh
-  ./scripts/run_rtabmap_rgbd.sh
+  ./scripts/robot/run_oak_camera.sh
+  ./scripts/robot/run_rtabmap_rgbd.sh
 
 Terminal C (host):
-  ./scripts/run_nav2_with_rtabmap.sh
+  ./scripts/robot/run_nav2_with_rtabmap.sh
 
 Then send a goal:
-  ./scripts/send_nav2_goal.sh 1.0 0.0 0.0 1.0
+  ./scripts/robot/send_nav2_goal.sh 1.0 0.0 0.0 1.0
 
 Note: Keep robot on the floor in open area before sending goals.
 EOF
@@ -121,12 +121,12 @@ main_menu() {
     case "$choice" in
       1) open_easy_menu ;;
       2) connection_report ;;
-      3) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/teleop_drive_app.sh" ;;
-      4) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/teleop_gamecube_hidraw.sh" ;;
-      5) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/teleop_arrow_keys.sh" ;;
-      6) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/ros_health_check.sh" ;;
-      7) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/preflight_autonomy.sh" ;;
-      8) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/software_readiness_audit.sh" ;;
+      3) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/robot/teleop_drive_app.sh" ;;
+      4) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/robot/teleop_gamecube_hidraw.sh" ;;
+      5) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/robot/teleop_arrow_keys.sh" ;;
+      6) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/robot/ros_health_check.sh" ;;
+      7) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/robot/preflight_autonomy.sh" ;;
+      8) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/build/software_readiness_audit.sh" ;;
       9) guided_nav2_start ;;
       10)
         if [[ "$DRY_RUN" == "1" ]]; then

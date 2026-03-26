@@ -7,12 +7,12 @@ This file records critical system-level changes made during setup.
 - RTAB-Map launch smoke-tested in container.
 - Nav2 launch + action server smoke-tested in container.
 - New helper scripts:
-  - `scripts/build_rtabmap_image.sh`
-  - `scripts/run_rtabmap_container.sh`
-  - `scripts/record_raw_bag.sh`
-  - `scripts/run_rtabmap_rgbd.sh`
-  - `scripts/run_nav2_with_rtabmap.sh`
-  - `scripts/send_nav2_goal.sh`
+  - `scripts/build/build_rtabmap_image.sh`
+  - `scripts/robot/run_rtabmap_container.sh`
+  - `scripts/robot/record_raw_bag.sh`
+  - `scripts/robot/run_rtabmap_rgbd.sh`
+  - `scripts/robot/run_nav2_with_rtabmap.sh`
+  - `scripts/robot/send_nav2_goal.sh`
 
 ## 2) Jetson package-manager recovery
 Issue encountered:

@@ -7,7 +7,7 @@ The default launcher is Docker-first and uses the unified robot runtime image `g
 ## Run
 
 ```bash
-./scripts/teleop_gamecube_hidraw.sh
+./scripts/robot/teleop_gamecube_hidraw.sh
 ```
 
 Optional overrides:
@@ -19,7 +19,7 @@ DEADMAN_BUTTON=A \
 TURBO_BUTTON=R \
 LINEAR_MAX=0.20 \
 ANGULAR_MAX=1.2 \
-./scripts/teleop_gamecube_hidraw.sh
+./scripts/robot/teleop_gamecube_hidraw.sh
 ```
 
 Notes:
@@ -55,7 +55,7 @@ On this Jetson, the working path was:
 Current known-good command:
 
 ```bash
-GAMECUBE_HIDRAW=/dev/hidraw0 ./scripts/teleop_gamecube_hidraw.sh
+GAMECUBE_HIDRAW=/dev/hidraw0 ./scripts/robot/teleop_gamecube_hidraw.sh
 ```
 
 Expected live startup status now looks like:
@@ -76,7 +76,7 @@ Expected live startup status now looks like:
 If opening `/dev/hidraw0` fails with `Permission denied`, use the least-invasive workaround that gets you unblocked:
 
 ```bash
-sudo ./scripts/teleop_gamecube_hidraw.sh
+sudo ./scripts/robot/teleop_gamecube_hidraw.sh
 ```
 
 If you only want temporary access to the node for your current user:
@@ -109,5 +109,5 @@ Expected lines for the adapter used here:
 Confirm ROS visibility to the robot:
 
 ```bash
-./scripts/ros_health_check.sh
+./scripts/robot/ros_health_check.sh
 ```

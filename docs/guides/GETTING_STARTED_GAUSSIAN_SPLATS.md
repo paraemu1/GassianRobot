@@ -14,6 +14,8 @@ cd /home/cam/GassianRobot
 ./scripts/gs_tui.sh
 ```
 
+This now opens the ncurses-based workflow UI by default on a real terminal.
+
 For first-time robot operators, use the simplest scan menu:
 
 ```bash
@@ -42,7 +44,7 @@ Use these top-level menus:
 Non-destructive self-test:
 
 ```bash
-./scripts/test_gs_tui.sh
+./scripts/tests/test_gs_tui.sh
 ```
 
 ## 2) One-time host setup
@@ -67,13 +69,13 @@ python3 -m pip install --user depthai opencv-python
 Fast validation (cached):
 
 ```bash
-./scripts/validate_docker_builds.sh --mode cached --target all
+./scripts/build/validate_docker_builds.sh --mode cached --target all
 ```
 
 Full clean validation (slow, but strongest check):
 
 ```bash
-./scripts/validate_docker_builds.sh --mode clean --target training
+./scripts/build/validate_docker_builds.sh --mode clean --target training
 ```
 
 ## 4) Capture a handheld scan
@@ -85,10 +87,25 @@ From TUI:
 CLI equivalent:
 
 ```bash
-./scripts/manual_handheld_oak_capture_test.sh
+./scripts/gaussian/manual_handheld_oak_capture_test.sh
 ```
 
 This creates a run under `runs/YYYY-MM-DD-...` and includes blur filtering.
+
+If you already have an RTAB-Map scan run with `rtabmap.db`, you do not need a handheld capture. Use:
+
+From TUI:
+1. `Workflow`
+2. `Prepare selected run`
+3. Pick the RTAB-Map run
+
+CLI equivalent:
+
+```bash
+./scripts/gaussian/prepare_gs_input_from_run.sh --run runs/<your-rtabmap-run>
+```
+
+That exports the RTAB-Map database into `dataset/transforms.json` plus a sparse seed cloud so the run becomes trainable by the normal Gaussian workflow.
 
 ## 5) Start training
 
@@ -100,7 +117,7 @@ From TUI:
 CLI equivalent:
 
 ```bash
-./scripts/start_gaussian_training_job.sh --run latest --mode prep-train --max-iters 30000
+./scripts/gaussian/start_gaussian_training_job.sh --run latest --mode prep-train --max-iters 30000
 ```
 
 Important: `--run latest` is context-aware now.
@@ -110,20 +127,20 @@ Important: `--run latest` is context-aware now.
 ## 6) Watch status and logs
 
 ```bash
-./scripts/training_job_status.sh --run latest
-./scripts/watch_gaussian_training_job.sh --run latest
+./scripts/gaussian/training_job_status.sh --run latest
+./scripts/gaussian/watch_gaussian_training_job.sh --run latest
 ```
 
 Stop a job:
 
 ```bash
-./scripts/stop_gaussian_training_job.sh --run latest
+./scripts/gaussian/stop_gaussian_training_job.sh --run latest
 ```
 
 Force stop:
 
 ```bash
-./scripts/stop_gaussian_training_job.sh --run latest --force
+./scripts/gaussian/stop_gaussian_training_job.sh --run latest --force
 ```
 
 ## 7) Start viewer
@@ -133,10 +150,14 @@ From TUI:
 2. `Start viewer`
 3. Pick a viewer-ready run
 
+To start the viewer and request a browser open from the TUI, use:
+1. `Workflow`
+2. `Start viewer + open browser`
+
 CLI equivalent:
 
 ```bash
-./scripts/start_gaussian_viewer.sh --run latest --port 7007
+./scripts/gaussian/start_gaussian_viewer.sh --run latest --port 7007
 ```
 
 Open browser:
@@ -153,7 +174,7 @@ Tailscale notes from live Jetson testing:
 Stop viewer:
 
 ```bash
-./scripts/stop_gaussian_viewer.sh --run latest
+./scripts/gaussian/stop_gaussian_viewer.sh --run latest
 ```
 
 ## 8) Delete/restore runs safely
@@ -161,20 +182,20 @@ Stop viewer:
 Soft delete (moves to trash):
 
 ```bash
-./scripts/delete_run.sh --run latest
+./scripts/run_tools/delete_run.sh --run latest
 ```
 
 Restore:
 
 ```bash
-./scripts/restore_run.sh --list
-./scripts/restore_run.sh --entry <trash-entry-name>
+./scripts/run_tools/restore_run.sh --list
+./scripts/run_tools/restore_run.sh --entry <trash-entry-name>
 ```
 
 Purge old trash:
 
 ```bash
-./scripts/purge_run_trash.sh --older-than-days 30
+./scripts/run_tools/purge_run_trash.sh --older-than-days 30
 ```
 
 ## 9) Troubleshooting: “No active process”
@@ -182,7 +203,7 @@ Purge old trash:
 If `watch_gaussian_training_job.sh` says no active process:
 1. Check status:
    ```bash
-   ./scripts/training_job_status.sh --run latest
+   ./scripts/gaussian/training_job_status.sh --run latest
    ```
 2. If `State: exited` with an exit code:
    - Training started but failed quickly.

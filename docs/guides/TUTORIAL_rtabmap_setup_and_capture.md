@@ -8,15 +8,15 @@ This project uses a unified robot runtime Docker image for live robot work, but 
 
 The current live stack is:
 
-- Host shell starts `./scripts/run_robot_runtime_container.sh`
+- Host shell starts `./scripts/robot/run_robot_runtime_container.sh`
 - Unified runtime container `ros_humble_robot_runtime` defaults to a local-only autonomy graph:
   - `ROS_DOMAIN_ID=42`
   - `DDS_IFACE=lo`
-- `./scripts/run_oak_camera.sh` launches `depthai_ros_driver` with `config/oak_rgbd_sync.yaml` so RGB and stereo are published in sync
-- `./scripts/run_rtabmap_rgbd.sh` now defaults to the validated wheel-odom-assisted path on this Jetson/robot setup
-- `./scripts/run_create3_cmd_vel_bridge.sh start` bridges only `/cmd_vel` to the Create 3 DDS graph on `l4tbr0`
-- `./scripts/run_create3_odom_bridge.sh start` bridges Create 3 wheel odometry back onto the autonomy graph
-- `./scripts/run_nav2_with_rtabmap.sh` runs later on the same local autonomy graph
+- `./scripts/robot/run_oak_camera.sh` launches `depthai_ros_driver` with `config/oak_rgbd_sync.yaml` so RGB and stereo are published in sync
+- `./scripts/robot/run_rtabmap_rgbd.sh` now defaults to the validated wheel-odom-assisted path on this Jetson/robot setup
+- `./scripts/robot/run_create3_cmd_vel_bridge.sh start` bridges only `/cmd_vel` to the Create 3 DDS graph on `l4tbr0`
+- `./scripts/robot/run_create3_odom_bridge.sh start` bridges Create 3 wheel odometry back onto the autonomy graph
+- `./scripts/robot/run_nav2_with_rtabmap.sh` runs later on the same local autonomy graph
 
 Important sync notes:
 
@@ -31,15 +31,15 @@ Important sync notes:
 
 ```bash
 chmod +x scripts/*.sh
-./scripts/build_robot_runtime_image.sh
+./scripts/build/build_robot_runtime_image.sh
 ```
 
-Compatibility note: `./scripts/build_rtabmap_image.sh` still works, but the preferred entrypoint is `build_robot_runtime_image.sh`.
+Compatibility note: `./scripts/build/build_rtabmap_image.sh` still works, but the preferred entrypoint is `build_robot_runtime_image.sh`.
 
 ## 2) Start container
 
 ```bash
-./scripts/run_robot_runtime_container.sh
+./scripts/robot/run_robot_runtime_container.sh
 ```
 
 Expected runtime mode:
@@ -69,7 +69,7 @@ That broader device exposure was the key fix that allowed the OAK ROS driver to 
 ## 3) Launch OAK camera driver
 
 ```bash
-./scripts/run_oak_camera.sh
+./scripts/robot/run_oak_camera.sh
 ```
 
 This can be run from the host; the wrapper will exec into the running robot runtime container.
@@ -79,13 +79,13 @@ By default, `run_oak_camera.sh` loads `config/oak_rgbd_sync.yaml` so the depthai
 Optional:
 
 ```bash
-PARENT_FRAME=base_link NAME=oak ./scripts/run_oak_camera.sh
+PARENT_FRAME=base_link NAME=oak ./scripts/robot/run_oak_camera.sh
 ```
 
 ## 4) Validate camera topics before RTAB-Map
 
 ```bash
-REQUIRE_ODOM_TOPIC=0 REQUIRE_SCAN_TOPIC=0 ./scripts/ros_health_check.sh
+REQUIRE_ODOM_TOPIC=0 REQUIRE_SCAN_TOPIC=0 ./scripts/robot/ros_health_check.sh
 ```
 
 Expected minimum set:
@@ -101,7 +101,7 @@ Before RTAB-Map starts, `/odom` may still be absent if the odom bridge is not up
 ## 5) Capture raw bag
 
 ```bash
-RUN_NAME=$(date +%F)-lab_loop_a ./scripts/record_raw_bag.sh
+RUN_NAME=$(date +%F)-lab_loop_a ./scripts/robot/record_raw_bag.sh
 ```
 
 Example with explicit depth topic:
@@ -109,7 +109,7 @@ Example with explicit depth topic:
 ```bash
 DEPTH_TOPIC=/oak/depth/image_raw \
 RUN_NAME=$(date +%F)-lab_loop_a \
-./scripts/record_raw_bag.sh
+./scripts/robot/record_raw_bag.sh
 ```
 
 The bag wrapper also applies rosbag QoS overrides for sensor topics and `/tf_static`, which avoids the common Humble issue where best-effort OAK streams or latched static transforms are missed during recording.
@@ -117,21 +117,21 @@ The bag wrapper also applies rosbag QoS overrides for sensor topics and `/tf_sta
 ## 6) Launch RTAB-Map
 
 ```bash
-./scripts/run_create3_odom_bridge.sh start
-./scripts/run_rtabmap_rgbd.sh
+./scripts/robot/run_create3_odom_bridge.sh start
+./scripts/robot/run_rtabmap_rgbd.sh
 ```
 
 If you intentionally want the older pure visual-odometry debug path:
 
 ```bash
-VISUAL_ODOMETRY=true ./scripts/run_rtabmap_rgbd.sh
+VISUAL_ODOMETRY=true ./scripts/robot/run_rtabmap_rgbd.sh
 ```
 
 ## 7) Check live RTAB-Map sync and TF after launch
 
 ```bash
-./scripts/check_rtabmap_sync.sh
-CHECK_MAP_ODOM_TF=1 ./scripts/check_rtabmap_sync.sh
+./scripts/robot/check_rtabmap_sync.sh
+CHECK_MAP_ODOM_TF=1 ./scripts/robot/check_rtabmap_sync.sh
 ```
 
 On 2026-03-25 the validated floor-run path used the split DDS architecture plus the Create 3 odom bridge and produced live `/odom`, `/rtabmap/map`, and ready `odom <- base_link` / `map <- odom` TF while the Create 3 base stayed healthy on its separate DDS graph.

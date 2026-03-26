@@ -5,21 +5,21 @@ This project now includes a validated live mission launcher, a split DDS runtime
 ## Architecture
 
 - Local autonomy graph:
-  - `./scripts/run_robot_runtime_container.sh`
+  - `./scripts/robot/run_robot_runtime_container.sh`
   - defaults to `ROS_DOMAIN_ID=42`
   - defaults to `DDS_IFACE=lo`
   - runs OAK + RTAB-Map + Nav2 without flooding the Create 3 USB DDS link
 - Robot graph:
   - Create 3 remains on `ROS_DOMAIN_ID=0` over `l4tbr0`
 - Bridge:
-  - `./scripts/run_create3_cmd_vel_bridge.sh`
-  - `./scripts/run_create3_odom_bridge.sh`
+  - `./scripts/robot/run_create3_cmd_vel_bridge.sh`
+  - `./scripts/robot/run_create3_odom_bridge.sh`
 - Robot base health:
-  - `./scripts/create3_base_health_check.sh`
+  - `./scripts/robot/create3_base_health_check.sh`
 - Robot motion-ready gate:
-  - `./scripts/create3_motion_ready_check.sh`
+  - `./scripts/robot/create3_motion_ready_check.sh`
 - Robot dock helpers:
-  - `./scripts/create3_dock_control.sh`
+  - `./scripts/robot/create3_dock_control.sh`
 
 This split is now the default because running the entire autonomy stack directly on the Create 3 DDS graph could OOM-kill `create-platform` on the robot.
 
@@ -28,12 +28,12 @@ This split is now the default because running the entire autonomy stack directly
 From repo root:
 
 ```bash
-./scripts/software_readiness_audit.sh
-./scripts/create3_base_health_check.sh
-./scripts/create3_dock_control.sh status
-./scripts/launch_live_auto_scan.sh start-only
-./scripts/preflight_autonomy.sh
-DRY_RUN=1 ./scripts/launch_live_auto_scan.sh mission
+./scripts/build/software_readiness_audit.sh
+./scripts/robot/create3_base_health_check.sh
+./scripts/robot/create3_dock_control.sh status
+./scripts/robot/launch_live_auto_scan.sh start-only
+./scripts/robot/preflight_autonomy.sh
+DRY_RUN=1 ./scripts/robot/launch_live_auto_scan.sh mission
 ```
 
 ## Waypoints and mission shape
@@ -59,25 +59,25 @@ Example line:
 1. Verify Create 3 base health:
 
 ```bash
-./scripts/create3_base_health_check.sh
+./scripts/robot/create3_base_health_check.sh
 ```
 
 2. Bring up the split autonomy stack:
 
 ```bash
-RUN_NAME="$(date +%F-%H%M)-live-auto-scan" ./scripts/launch_live_auto_scan.sh start-only
+RUN_NAME="$(date +%F-%H%M)-live-auto-scan" ./scripts/robot/launch_live_auto_scan.sh start-only
 ```
 
 3. Run the final mission gate:
 
 ```bash
-NEED_ROBOT=1 ./scripts/preflight_autonomy.sh
+NEED_ROBOT=1 ./scripts/robot/preflight_autonomy.sh
 ```
 
 4. Execute mission:
 
 ```bash
-RUN_NAME="<same-run-name>" ./scripts/launch_live_auto_scan.sh mission
+RUN_NAME="<same-run-name>" ./scripts/robot/launch_live_auto_scan.sh mission
 ```
 
 Optional:
@@ -86,7 +86,7 @@ Optional:
 RUN_NAME="<same-run-name>" \
 GENERATE_LIVE_WAYPOINTS=0 \
 WAYPOINT_FILE=./config/scan_waypoints_room_a_conservative.tsv \
-./scripts/launch_live_auto_scan.sh mission
+./scripts/robot/launch_live_auto_scan.sh mission
 ```
 
 ## Notes
@@ -107,8 +107,8 @@ WAYPOINT_FILE=./config/scan_waypoints_room_a_conservative.tsv \
 
 Verified on 2026-03-25:
 
-- `./scripts/create3_base_health_check.sh` passed on the live robot
-- `NEED_ROBOT=1 ./scripts/preflight_autonomy.sh` passed
+- `./scripts/robot/create3_base_health_check.sh` passed on the live robot
+- `NEED_ROBOT=1 ./scripts/robot/preflight_autonomy.sh` passed
 - local autonomy graph stayed healthy with OAK + RTAB-Map + Nav2 up
 - robot-domain `/cmd_vel` showed both a publisher and a robot subscriber through the bridge
 - robot-domain odometry was bridged back onto the autonomy graph for RTAB-Map / Nav2
@@ -121,5 +121,5 @@ Bottom line:
 
 - the software path is now correctly split between local autonomy DDS and robot DDS
 - the previous Create 3 control-path blocker is fixed
-- the current preferred floor-run entrypoint is `./scripts/launch_live_auto_scan.sh`
+- the current preferred floor-run entrypoint is `./scripts/robot/launch_live_auto_scan.sh`
 - the current floor-run behavior is conservative by design: stop-go captures, explicit boundary handling, and no deliberate “push through” recovery behavior

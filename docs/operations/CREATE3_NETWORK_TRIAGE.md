@@ -19,16 +19,16 @@ Do not assume a firmware reflash is required until you check for that pattern.
 
 ## Recommended steady-state architecture
 
-- Autonomy graph: `./scripts/run_robot_runtime_container.sh`
+- Autonomy graph: `./scripts/robot/run_robot_runtime_container.sh`
   - defaults to `ROS_DOMAIN_ID=42`
   - defaults to `DDS_IFACE=lo`
   - keeps OAK + RTAB-Map + Nav2 traffic off the robot USB DDS link
 - Robot graph: Create 3 on `ROS_DOMAIN_ID=0` over `l4tbr0`
-- Bridge: `./scripts/run_create3_cmd_vel_bridge.sh start`
+- Bridge: `./scripts/robot/run_create3_cmd_vel_bridge.sh start`
   - forwards only `/cmd_vel` from the local autonomy graph to the robot
-- Robot health check: `./scripts/create3_base_health_check.sh`
+- Robot health check: `./scripts/robot/create3_base_health_check.sh`
 - Direct full-graph DDS on `l4tbr0` is debugging-only now:
-  - `CREATE3_DIRECT_DDS=1 ./scripts/run_robot_runtime_container.sh`
+  - `CREATE3_DIRECT_DDS=1 ./scripts/robot/run_robot_runtime_container.sh`
 
 ## 1) Wired USB sanity check
 
@@ -93,24 +93,24 @@ Use this as the default recovery path:
 
 ```bash
 cd /home/cam/GassianRobot
-./scripts/run_robot_runtime_container.sh
-./scripts/run_create3_cmd_vel_bridge.sh start
+./scripts/robot/run_robot_runtime_container.sh
+./scripts/robot/run_create3_cmd_vel_bridge.sh start
 ```
 
 Then bring up the rest of the stack on the local autonomy graph:
 
 ```bash
-./scripts/run_create3_odom_bridge.sh start
-./scripts/run_oak_camera.sh
-./scripts/run_rtabmap_rgbd.sh
-./scripts/run_nav2_with_rtabmap.sh
+./scripts/robot/run_create3_odom_bridge.sh start
+./scripts/robot/run_oak_camera.sh
+./scripts/robot/run_rtabmap_rgbd.sh
+./scripts/robot/run_nav2_with_rtabmap.sh
 ```
 
 ## 5) Verify that the robot base recovered
 
 ```bash
 cd /home/cam/GassianRobot
-./scripts/create3_base_health_check.sh
+./scripts/robot/create3_base_health_check.sh
 ```
 
 Healthy base criteria for this repo:

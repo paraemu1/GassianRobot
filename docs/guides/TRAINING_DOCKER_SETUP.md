@@ -16,15 +16,15 @@ cd /home/cam/GassianRobot
 Preferred runtime entrypoints:
 
 ```bash
-./scripts/build_robot_runtime_image.sh
-./scripts/run_robot_runtime_container.sh
+./scripts/build/build_robot_runtime_image.sh
+./scripts/robot/run_robot_runtime_container.sh
 ```
 
 Compatibility aliases still supported:
 
 ```bash
-./scripts/build_rtabmap_image.sh
-./scripts/run_rtabmap_container.sh
+./scripts/build/build_rtabmap_image.sh
+./scripts/robot/run_rtabmap_container.sh
 ```
 
 `build_robot_runtime_image.sh` builds `docker/robot_runtime.Dockerfile` as `gassian/robot-runtime:latest` and also applies the legacy compatibility tag `gassian/ros2-humble-rtabmap:latest`.
@@ -32,13 +32,13 @@ Compatibility aliases still supported:
 ## 2) Build the training images
 
 ```bash
-./scripts/build_jetson_training_images.sh
+./scripts/build/build_jetson_training_images.sh
 ```
 
 Available build flags:
 
 ```bash
-./scripts/build_jetson_training_images.sh --no-cache --pull --progress plain
+./scripts/build/build_jetson_training_images.sh --no-cache --pull --progress plain
 ```
 
 Supported flags:
@@ -60,13 +60,13 @@ The training image flow is unchanged. Keep using these images for Gaussian datas
 Fast cached validation:
 
 ```bash
-./scripts/validate_docker_builds.sh --mode cached --target all
+./scripts/build/validate_docker_builds.sh --mode cached --target all
 ```
 
 Slow clean validation:
 
 ```bash
-./scripts/validate_docker_builds.sh --mode clean --target training
+./scripts/build/validate_docker_builds.sh --mode clean --target training
 ```
 
 Targets:
@@ -103,25 +103,25 @@ If you still see build issues, run clean validation and inspect the failing laye
 Start:
 
 ```bash
-./scripts/start_gaussian_training_job.sh --run latest --mode prep-train --max-iters 30000
+./scripts/gaussian/start_gaussian_training_job.sh --run latest --mode prep-train --max-iters 30000
 ```
 
 Status:
 
 ```bash
-./scripts/training_job_status.sh --run latest
+./scripts/gaussian/training_job_status.sh --run latest
 ```
 
 Watch logs:
 
 ```bash
-./scripts/watch_gaussian_training_job.sh --run latest
+./scripts/gaussian/watch_gaussian_training_job.sh --run latest
 ```
 
 Stop:
 
 ```bash
-./scripts/stop_gaussian_training_job.sh --run latest
+./scripts/gaussian/stop_gaussian_training_job.sh --run latest
 ```
 
 Run status metadata file:

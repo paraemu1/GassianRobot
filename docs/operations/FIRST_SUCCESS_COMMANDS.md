@@ -44,17 +44,17 @@ If the robot is physically connected but not reachable, check these first:
 ## Validated autonomy architecture (verified 2026-03-25)
 
 - local autonomy graph:
-  - `./scripts/run_robot_runtime_container.sh`
+  - `./scripts/robot/run_robot_runtime_container.sh`
   - defaults to `ROS_DOMAIN_ID=42`
   - defaults to `DDS_IFACE=lo`
 - robot graph:
   - Create 3 on `ROS_DOMAIN_ID=0` over `l4tbr0`
 - bridge:
-  - `./scripts/run_create3_cmd_vel_bridge.sh`
-  - `./scripts/run_create3_odom_bridge.sh`
+  - `./scripts/robot/run_create3_cmd_vel_bridge.sh`
+  - `./scripts/robot/run_create3_odom_bridge.sh`
   - forwards `/cmd_vel` to the robot and wheel odometry back to the autonomy graph
 - mapping:
-  - `./scripts/run_rtabmap_rgbd.sh`
+  - `./scripts/robot/run_rtabmap_rgbd.sh`
   - `/scan` is optional for the validated RGB-D path
 - failure signature to remember:
   - if you put the full autonomy stack directly on `l4tbr0`, the robot can OOM-kill `create-platform`
@@ -66,7 +66,7 @@ If the robot is physically connected but not reachable, check these first:
 curl --interface l4tbr0 -sS http://192.168.186.2/home | \
   grep -o 'version="[^"]*"\|rosversionname="[^"]*"'
 
-./scripts/create3_base_health_check.sh
+./scripts/robot/create3_base_health_check.sh
 ```
 
 Optional OOM/flood check:
@@ -85,14 +85,14 @@ chmod +x scripts/*.sh
 ## 2) Build container images
 
 ```bash
-./scripts/build_robot_runtime_image.sh
-./scripts/build_jetson_training_images.sh
+./scripts/build/build_robot_runtime_image.sh
+./scripts/build/build_jetson_training_images.sh
 ```
 
 ## 3) Start the runtime container on the local autonomy graph
 
 ```bash
-./scripts/run_robot_runtime_container.sh
+./scripts/robot/run_robot_runtime_container.sh
 ```
 
 Expected banner:
@@ -103,45 +103,45 @@ Expected banner:
 Use direct robot DDS mode only for debugging:
 
 ```bash
-CREATE3_DIRECT_DDS=1 ./scripts/run_robot_runtime_container.sh
+CREATE3_DIRECT_DDS=1 ./scripts/robot/run_robot_runtime_container.sh
 ```
 
 ## 4) Start the Create 3 bridges
 
 ```bash
-./scripts/run_create3_cmd_vel_bridge.sh start
-./scripts/run_create3_odom_bridge.sh start
+./scripts/robot/run_create3_cmd_vel_bridge.sh start
+./scripts/robot/run_create3_odom_bridge.sh start
 ```
 
 ## 5) Launch the OAK camera driver
 
 ```bash
-./scripts/run_oak_camera.sh
+./scripts/robot/run_oak_camera.sh
 ```
 
 Optional overrides:
 
 ```bash
-PARENT_FRAME=base_link NAME=oak ./scripts/run_oak_camera.sh
+PARENT_FRAME=base_link NAME=oak ./scripts/robot/run_oak_camera.sh
 ```
 
 ## 6) Launch RTAB-Map
 
 ```bash
-./scripts/run_rtabmap_rgbd.sh
+./scripts/robot/run_rtabmap_rgbd.sh
 ```
 
 If you intentionally want the older pure visual-odometry debug path:
 
 ```bash
-VISUAL_ODOMETRY=true ./scripts/run_rtabmap_rgbd.sh
+VISUAL_ODOMETRY=true ./scripts/robot/run_rtabmap_rgbd.sh
 ```
 
 ## 7) Check the local autonomy graph
 
 ```bash
-./scripts/check_rtabmap_sync.sh
-./scripts/ros_health_check.sh
+./scripts/robot/check_rtabmap_sync.sh
+./scripts/robot/ros_health_check.sh
 ```
 
 Expected:
@@ -153,7 +153,7 @@ Expected:
 ## 8) Launch Nav2
 
 ```bash
-./scripts/run_nav2_with_rtabmap.sh
+./scripts/robot/run_nav2_with_rtabmap.sh
 ```
 
 Verify the action is visible:
@@ -166,7 +166,7 @@ docker exec ros_humble_robot_runtime bash -lc \
 ## 9) Gate before goals or mission
 
 ```bash
-NEED_ROBOT=1 ./scripts/preflight_autonomy.sh
+NEED_ROBOT=1 ./scripts/robot/preflight_autonomy.sh
 ```
 
 Optional direct robot-domain check:
@@ -188,13 +188,13 @@ Healthy result on the robot graph:
 ## 10) Send a Nav2 goal
 
 ```bash
-./scripts/send_nav2_goal.sh 1.0 0.0 0.0 1.0
+./scripts/robot/send_nav2_goal.sh 1.0 0.0 0.0 1.0
 ```
 
 ## 11) Preferred full live mission
 
 ```bash
-RUN_NAME="$(date +%F-%H%M)-live-auto-scan" ./scripts/launch_live_auto_scan.sh start
+RUN_NAME="$(date +%F-%H%M)-live-auto-scan" ./scripts/robot/launch_live_auto_scan.sh start
 ```
 
 What this does now:
@@ -216,7 +216,7 @@ Optional lower-level mission call on an already-running stack:
 RUN_NAME="<same-run-name>" \
 GENERATE_LIVE_WAYPOINTS=0 \
 WAYPOINT_FILE=./config/scan_waypoints_room_a_conservative.tsv \
-./scripts/launch_live_auto_scan.sh mission
+./scripts/robot/launch_live_auto_scan.sh mission
 ```
 
 ## Direct robot-domain motion debug
@@ -247,7 +247,7 @@ The Mayflash / Nintendo GameCube adapter on this Jetson currently appears as:
 Working entrypoint:
 
 ```bash
-./scripts/teleop_gamecube_hidraw.sh
+./scripts/robot/teleop_gamecube_hidraw.sh
 ```
 
 Detailed runbook: `docs/operations/GAMECUBE_HIDRAW_TELEOP.md`
