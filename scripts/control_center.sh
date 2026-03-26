@@ -3,96 +3,17 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-FORCE_PLAIN="${CONTROL_TUI_FORCE_PLAIN:-0}"
 DRY_RUN="${CONTROL_TUI_DRY_RUN:-0}"
+TUI_FORCE_PLAIN="${CONTROL_TUI_FORCE_PLAIN:-${GASSIAN_TUI_FORCE_PLAIN:-0}}"
+TUI_USE_WHIPTAIL="${CONTROL_TUI_USE_WHIPTAIL:-${GASSIAN_TUI_USE_WHIPTAIL:-1}}"
+TUI_AUTOTEST="${CONTROL_TUI_AUTOTEST:-${GASSIAN_TUI_AUTOTEST:-0}}"
 
-have_whiptail=0
-if command -v whiptail >/dev/null 2>&1; then
-  have_whiptail=1
-fi
-if [[ "$FORCE_PLAIN" == "1" ]]; then
-  have_whiptail=0
-fi
-
-safe_clear() {
-  if [[ -t 1 && -n "${TERM:-}" ]]; then
-    clear || true
-  fi
-}
-
-pause_terminal() {
-  if [[ ! -t 0 ]]; then
-    return 0
-  fi
-  echo ""
-  read -rp "Press Enter to continue... " _
-}
-
-show_info() {
-  local msg="$1"
-  if [[ "$have_whiptail" -eq 1 ]]; then
-    whiptail --title "Control Center" --msgbox "$msg" 16 100
-  else
-    echo "$msg"
-    pause_terminal
-  fi
-}
-
-menu_choice() {
-  local title="$1"
-  local prompt="$2"
-  shift 2
-  local -a items=("$@")
-
-  if [[ "$have_whiptail" -eq 1 ]]; then
-    whiptail --title "$title" --menu "$prompt" 24 110 16 "${items[@]}" 3>&1 1>&2 2>&3 || true
-    return 0
-  fi
-
-  echo "$title"
-  echo "$prompt"
-  echo ""
-  local -a keys=()
-  local idx=1
-  local i
-  for ((i=0; i<${#items[@]}; i+=2)); do
-    keys+=("${items[$i]}")
-    echo "${idx}) ${items[$((i+1))]}"
-    idx=$((idx + 1))
-  done
-  echo ""
-  local pick
-  read -rp "Choose: " pick
-  if [[ ! "$pick" =~ ^[0-9]+$ || "$pick" -lt 1 || "$pick" -gt ${#keys[@]} ]]; then
-    echo ""
-    return 0
-  fi
-  echo "${keys[$((pick-1))]}"
-}
-
-run_cmd() {
-  if [[ "$DRY_RUN" == "1" ]]; then
-    echo "[DRY-RUN] $*"
-    pause_terminal
-    return 0
-  fi
-  safe_clear
-  echo "Running: $*"
-  echo ""
-  set +e
-  "$@"
-  local code=$?
-  set -e
-  echo ""
-  if [[ "$code" -ne 0 ]]; then
-    echo "Command failed with exit code $code"
-  fi
-  pause_terminal
-  return "$code"
-}
+# shellcheck source=./_tui_common.sh
+source "${SCRIPT_DIR}/_tui_common.sh"
+tui_init
 
 connection_report() {
-  safe_clear
+  tui_safe_clear
   echo "=== Create 3 USB-C connection report ==="
   echo "Repo: $REPO_ROOT"
   echo ""
@@ -115,7 +36,7 @@ connection_report() {
 
   local fw="unreachable"
   if [[ "$ping_ok" == "yes" ]]; then
-    fw="$(curl --interface "$iface" -sS http://192.168.186.2/home | grep -o 'version="[^"]*"\|rosversionname="[^"]*"' | paste -sd ', ' - || true)"
+    fw="$(curl --interface "$iface" -sS http://192.168.186.2/home | grep -o 'version=\"[^\"]*\"\|rosversionname=\"[^\"]*\"' | paste -sd ', ' - || true)"
     fw="${fw:-reachable (metadata parse failed)}"
   fi
 
@@ -131,15 +52,11 @@ connection_report() {
   echo "Docker daemon:      $docker_ok"
   echo ""
   echo "Tip: For USB-C-only Create 3 control, l4tbr0 should be UP and ping should be yes."
-  pause_terminal
-}
-
-show_demo_help() {
-  show_info "Demo flow (recommended):\n\n1) Run: Connection report\n2) Run: Manual drive app (improved)\n3) If robot connected and on floor, use Nav2 guided startup\n4) Send a goal with scripts/send_nav2_goal.sh\n\nSafety: keep robot on floor and clear area before autonomous commands."
+  tui_pause
 }
 
 guided_nav2_start() {
-  safe_clear
+  tui_safe_clear
   cat <<'EOF'
 Guided Nav2 + RTAB-Map startup (non-destructive):
 
@@ -161,7 +78,15 @@ Then send a goal:
 
 Note: Keep robot on the floor in open area before sending goals.
 EOF
-  pause_terminal
+  tui_pause
+}
+
+open_easy_menu() {
+  EASY_AUTONOMY_TUI_DRY_RUN="$DRY_RUN" \
+  GASSIAN_TUI_FORCE_PLAIN="$TUI_FORCE_PLAIN" \
+  GASSIAN_TUI_USE_WHIPTAIL="$TUI_USE_WHIPTAIL" \
+  GASSIAN_TUI_AUTOTEST="$TUI_AUTOTEST" \
+    "${SCRIPT_DIR}/easy_autonomy_tui.sh"
 }
 
 main_menu() {
@@ -172,76 +97,45 @@ main_menu() {
     fi
 
     local choice
-    choice="$(menu_choice \
-      "Create3 Control Center (${mode})" \
-      "Pick an action" \
-      "1" "Connection report (USB-C / l4tbr0)" \
-      "2" "Manual drive app (improved teleop)" \
-      "3" "GameCube controller teleop (hidraw adapter)" \
-      "4" "Legacy arrow-key teleop (fallback)" \
-      "5" "ROS health check" \
-      "6" "Guided Nav2 + scan startup (instructions)" \
-      "7" "Run software readiness audit" \
-      "8" "Run autonomy preflight (software-only)" \
-      "9" "Run autonomous scan mission (dry-run)" \
-      "10" "Start live auto-scan (one command)" \
-      "11" "Demo checklist" \
-      "12" "Toggle dry-run mode" \
-      "13" "Exit")"
+    if [[ "$TUI_HAVE_WHIPTAIL" != "1" ]]; then
+      tui_safe_clear
+    fi
+    if ! choice="$(tui_menu_choice \
+      "Advanced Robot Control Center (${mode})" \
+      "Use this only when the Easy Robot Scan Menu is not enough." \
+      "1" "Easy robot scan menu (recommended)" \
+      "2" "Check robot USB-C link" \
+      "3" "Manual drive app" \
+      "4" "GameCube controller teleop (hidraw adapter)" \
+      "5" "Legacy arrow-key teleop (fallback)" \
+      "6" "ROS health check" \
+      "7" "Autonomy preflight (software-only)" \
+      "8" "Software readiness audit" \
+      "9" "Guided Nav2 + scan startup notes" \
+      "10" "Toggle dry-run mode" \
+      "11" "Exit")"; then
+      echo "Bye."
+      return 0
+    fi
 
     case "$choice" in
-      1)
-        connection_report
-        ;;
-      2)
-        run_cmd "${SCRIPT_DIR}/teleop_drive_app.sh"
-        ;;
-      3)
-        run_cmd "${SCRIPT_DIR}/teleop_gamecube_hidraw.sh"
-        ;;
-      4)
-        run_cmd "${SCRIPT_DIR}/teleop_arrow_keys.sh"
-        ;;
-      5)
-        run_cmd "${SCRIPT_DIR}/ros_health_check.sh"
-        ;;
-      6)
-        guided_nav2_start
-        ;;
-      7)
-        run_cmd "${SCRIPT_DIR}/software_readiness_audit.sh"
-        ;;
-      8)
-        run_cmd "${SCRIPT_DIR}/preflight_autonomy.sh"
-        ;;
-      9)
-        safe_clear
-        echo "Running autonomous scan mission in DRY_RUN mode..."
-        echo ""
-        set +e
-        DRY_RUN=1 "${SCRIPT_DIR}/run_auto_scan_mission.sh"
-        code=$?
-        set -e
-        echo ""
-        if [[ "$code" -ne 0 ]]; then
-          echo "Mission dry-run failed with exit code $code"
-        fi
-        pause_terminal
-        ;;
+      1) open_easy_menu ;;
+      2) connection_report ;;
+      3) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/teleop_drive_app.sh" ;;
+      4) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/teleop_gamecube_hidraw.sh" ;;
+      5) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/teleop_arrow_keys.sh" ;;
+      6) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/ros_health_check.sh" ;;
+      7) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/preflight_autonomy.sh" ;;
+      8) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/software_readiness_audit.sh" ;;
+      9) guided_nav2_start ;;
       10)
-        run_cmd "${SCRIPT_DIR}/start_live_auto_scan.sh"
-        ;;
-      11)
-        show_demo_help
-        ;;
-      12)
         if [[ "$DRY_RUN" == "1" ]]; then
           DRY_RUN=0
         else
           DRY_RUN=1
         fi
         ;;
-      13|"")
+      11)
         echo "Bye."
         return 0
         ;;

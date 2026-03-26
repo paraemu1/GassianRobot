@@ -32,6 +32,7 @@ check_cmd python3
 check_cmd bash
 check_cmd ip
 check_cmd ping
+if command -v whiptail >/dev/null 2>&1; then p "command present: whiptail"; else w "command missing: whiptail (operator TUI falls back to plain text)"; fi
 
 if docker info >/dev/null 2>&1; then
   p "docker daemon reachable"
@@ -44,9 +45,12 @@ for img in gassian/robot-runtime:latest gassian/ros2-humble-rtabmap:latest gassi
 done
 
 for s in \
+  scripts/easy_autonomy_tui.sh \
   scripts/control_center.sh \
+  scripts/master_tui.sh \
   scripts/teleop_drive_app.sh \
   scripts/teleop_drive_app.py \
+  scripts/launch_live_auto_scan.sh \
   scripts/run_robot_runtime_container.sh \
   scripts/run_create3_cmd_vel_bridge.sh \
   scripts/create3_base_health_check.sh \
@@ -57,7 +61,13 @@ for s in \
   if [[ -f "$REPO_ROOT/$s" ]]; then p "file exists: $s"; else f "missing file: $s"; fi
 done
 
-if [[ -x "$REPO_ROOT/scripts/control_center.sh" ]]; then p "control_center executable"; else w "control_center not executable"; fi
+for s in scripts/easy_autonomy_tui.sh scripts/control_center.sh scripts/master_tui.sh; do
+  if [[ -x "$REPO_ROOT/$s" ]]; then
+    p "executable: $s"
+  else
+    w "not executable: $s"
+  fi
+done
 
 if ip link show l4tbr0 >/dev/null 2>&1; then
   p "network iface present: l4tbr0"

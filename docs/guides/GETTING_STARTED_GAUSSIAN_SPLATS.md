@@ -14,13 +14,19 @@ cd /home/cam/GassianRobot
 ./scripts/gs_tui.sh
 ```
 
-For robot control + navigation checks, use the dedicated control center:
+For first-time robot operators, use the simplest scan menu:
+
+```bash
+./scripts/easy_autonomy_tui.sh
+```
+
+For advanced robot control + navigation checks, use the dedicated control center:
 
 ```bash
 ./scripts/control_center.sh
 ```
 
-For the all-in-one menu with Demo and Debug sections, use:
+For the top-level launcher that points you to the easy scan menu, advanced robot tools, or Gaussian workflow, use:
 
 ```bash
 ./scripts/master_tui.sh

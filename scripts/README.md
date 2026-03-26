@@ -4,9 +4,10 @@ Use this folder for executable entrypoints. Most day-to-day work should start fr
 
 ## Main Menus
 
+- `./scripts/easy_autonomy_tui.sh`: ncurses-first operator menu for the validated scan flow
 - `./scripts/gs_tui.sh`: primary Gaussian capture/train/view workflow
-- `./scripts/control_center.sh`: Create 3 control, teleop, ROS checks, and guided autonomy startup
-- `./scripts/master_tui.sh`: demo/debug umbrella menu that links to both of the above
+- `./scripts/control_center.sh`: advanced Create 3 control, teleop, ROS checks, and guided bringup notes
+- `./scripts/master_tui.sh`: thin top-level launcher that points operators toward the easy scan menu first
 - `./scripts/teleop_gamecube_hidraw.sh`: GameCube controller teleop for a Mayflash/Nintendo adapter exposed as `/dev/hidraw*`
 
 ## Gaussian Workflow
@@ -74,6 +75,7 @@ Use this folder for executable entrypoints. Most day-to-day work should start fr
 - `build_rtabmap_image.sh` (compatibility alias to the robot runtime image build)
 - `validate_docker_builds.sh`
 - `test_gs_tui.sh`
+- `test_operator_tuis.sh`
 
 ## Notes
 
@@ -89,6 +91,10 @@ Use this folder for executable entrypoints. Most day-to-day work should start fr
 - `check_rtabmap_sync.sh` now covers both live timestamp deltas and TF readiness for `odom <- base_link`; set `CHECK_MAP_ODOM_TF=1` after RTAB-Map starts if you also want `map <- odom` checked in the same pass.
 - The preferred full autonomous scan entrypoint is `./scripts/launch_live_auto_scan.sh start`. It starts Docker if needed, starts the runtime container, both Create 3 bridges, OAK, RTAB-Map, Nav2, saves the RTAB-Map database into the run directory, auto-undocks, runs the stop-and-go mission, stops the stack, and then re-docks on a successful mission.
 - `launch_live_auto_scan.sh start-only` brings the stack up without motion, `launch_live_auto_scan.sh mission` runs only the mission/closeout on an already-running stack, and `launch_live_auto_scan.sh stop|status` handle shutdown and inspection.
+- `easy_autonomy_tui.sh` is the simplest operator-facing entrypoint. It now prefers an ncurses menu via `whiptail`, remembers the last run name for the two-step `start-only` then `mission` flow, and exposes only the common actions needed for a supervised scan session.
+- `control_center.sh` has been pruned down to advanced/manual tools only; the older duplicated scan actions were removed so operators are funneled into `easy_autonomy_tui.sh`.
+- `master_tui.sh` has also been pruned. It is now just a top-level launcher, not a separate nested autonomy workflow.
+- The operator-facing TUI scripts now share the same helper code and hand off directly between menus instead of wrapping interactive TUIs inside extra shell prompts.
 - `run_local_stopgo_scan_mission.sh` is now the default floor-run mission path. It runs an outward-only stop-go survey, captures at survey stops, and then returns by backtracking executed segments instead of capturing again on the way back.
 - `launch_live_auto_scan.sh` now runs `create3_motion_ready_check.sh` after undock / settle. That check is meant to catch unsafe cliff readings before the mission starts; a stationary `stop_status` bit by itself is not treated as a hard failure.
 - The live mission now treats drive aborts and unsafe cliff readings as boundary events. On a real ledge / obstacle stop, it backtracks toward entry instead of issuing more forward segments into the same blockage.

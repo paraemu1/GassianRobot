@@ -30,8 +30,9 @@ Repository for Jetson-first robotics capture, Gaussian splat training/viewing, a
 ## Common Entry Points
 
 - `./scripts/gs_tui.sh`: main Gaussian workflow menu
-- `./scripts/control_center.sh`: robot control and quick diagnostics
-- `./scripts/master_tui.sh`: higher-level demo/debug menu
+- `./scripts/easy_autonomy_tui.sh`: simple operator menu for dock / health / start-only / mission / full scan
+- `./scripts/control_center.sh`: advanced robot control and diagnostics
+- `./scripts/master_tui.sh`: thin top-level launcher for easy scan / advanced robot tools / Gaussian workflow
 - `./scripts/build_robot_runtime_image.sh`: preferred robot runtime image build
 - `./scripts/run_robot_runtime_container.sh`: preferred robot runtime shell launcher
 - `./scripts/validate_docker_builds.sh --mode cached --target all`: quick environment validation
