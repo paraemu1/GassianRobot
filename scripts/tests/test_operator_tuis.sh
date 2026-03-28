@@ -40,33 +40,39 @@ COMMON_ENV=(
 )
 
 run_sequence \
-  "Easy menu supports prepare-then-mission flow" \
-  "launch_live_auto_scan\\.sh mission" \
-  "2\ny\n3\ny\n13\n" \
+  "Easy wrapper opens robot scan and supports prepare-then-mission flow" \
+  "launch_live_auto_scan\\.sh[[:space:]]+mission" \
+  "2\n3\n0\n0\n" \
   "${COMMON_ENV[@]}" EASY_AUTONOMY_TUI_DRY_RUN=1 "${SCRIPT_DIR}/../easy_autonomy_tui.sh"
 
 run_sequence \
-  "Easy menu lists previous scan runs" \
-  "Recorded scan runs" \
-  "5\n13\n" \
+  "Easy wrapper lists previous scan runs" \
+  "Previous Scan Runs" \
+  "5\n0\n0\n" \
   "${COMMON_ENV[@]}" EASY_AUTONOMY_TUI_DRY_RUN=1 "${SCRIPT_DIR}/../easy_autonomy_tui.sh"
 
 run_sequence \
-  "Control center routes into the easy menu" \
-  "Easy Robot Scan Menu" \
-  "1\n13\n11\n" \
+  "Control wrapper opens robot tools section" \
+  "Robot Tools" \
+  "0\n0\n" \
   "${COMMON_ENV[@]}" CONTROL_TUI_DRY_RUN=1 "${SCRIPT_DIR}/../control_center.sh"
 
 run_sequence \
-  "Master launcher routes into the advanced control center" \
-  "Advanced Robot Control Center" \
-  "2\n11\n6\n" \
+  "Master launcher opens robot tools section" \
+  "Robot Tools" \
+  "2\n0\n0\n" \
   "${COMMON_ENV[@]}" MASTER_TUI_DRY_RUN=1 "${SCRIPT_DIR}/../master_tui.sh"
 
 run_sequence \
-  "Master launcher routes into the Gaussian workflow menu" \
-  "Project Workflow TUI" \
-  "3\n0\n6\n" \
+  "Master launcher opens Handheld Capture section" \
+  "Handheld Capture" \
+  "3\n0\n0\n" \
+  "${COMMON_ENV[@]}" MASTER_TUI_DRY_RUN=1 GS_TUI_AUTOTEST=1 GS_TUI_FORCE_PLAIN=1 "${SCRIPT_DIR}/../master_tui.sh"
+
+run_sequence \
+  "Master launcher opens scan-to-browser section" \
+  "Turn Scan Into 3D Browser View" \
+  "4\n0\n0\n" \
   "${COMMON_ENV[@]}" MASTER_TUI_DRY_RUN=1 GS_TUI_AUTOTEST=1 GS_TUI_FORCE_PLAIN=1 "${SCRIPT_DIR}/../master_tui.sh"
 
 echo ""

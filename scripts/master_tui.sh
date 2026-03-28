@@ -2,91 +2,80 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DRY_RUN="${MASTER_TUI_DRY_RUN:-0}"
-TUI_FORCE_PLAIN="${MASTER_TUI_FORCE_PLAIN:-${GASSIAN_TUI_FORCE_PLAIN:-0}}"
-TUI_USE_WHIPTAIL="${MASTER_TUI_USE_WHIPTAIL:-${GASSIAN_TUI_USE_WHIPTAIL:-1}}"
-TUI_AUTOTEST="${MASTER_TUI_AUTOTEST:-${GASSIAN_TUI_AUTOTEST:-0}}"
 
-# shellcheck source=./lib/_tui_common.sh
-source "${SCRIPT_DIR}/lib/_tui_common.sh"
-tui_init
+SAFE_MODE="${MASTER_TUI_SAFE_MODE:-${MASTER_TUI_DRY_RUN:-0}}"
+FORCE_PLAIN="${MASTER_TUI_FORCE_PLAIN:-${GASSIAN_TUI_FORCE_PLAIN:-${GS_TUI_FORCE_PLAIN:-0}}}"
+AUTOTEST="${MASTER_TUI_AUTOTEST:-${GASSIAN_TUI_AUTOTEST:-${GS_TUI_AUTOTEST:-0}}}"
+START_SECTION="${MASTER_TUI_START_SECTION:-}"
 
-show_banner() {
-  tui_safe_clear
-  cat <<'EOF'
-=============================================
-   GassianRobot Launcher
-   Easy Scan + Advanced Tools + Gaussian UI
-=============================================
-EOF
+usage() {
+  cat <<'USAGE'
+Unified master TUI launcher.
+
+Usage:
+  ./scripts/master_tui.sh [--safe-mode] [--force-plain] [--start-section <section>]
+
+Options:
+  --safe-mode              Preview or dry-run supported actions.
+  --force-plain            Use the shell fallback instead of ncurses.
+  --start-section <name>   Open a section first, then return to the main menu.
+                           Supported: robot-scan, robot-tools, handheld, gaussian, runs, builds, diagnostics
+  -h, --help               Show this help.
+
+Environment:
+  MASTER_TUI_SAFE_MODE=1   Same as --safe-mode.
+  MASTER_TUI_DRY_RUN=1     Compatibility alias for --safe-mode.
+  MASTER_TUI_FORCE_PLAIN=1 Same as --force-plain.
+  MASTER_TUI_AUTOTEST=1    Skip pauses in the plain fallback where possible.
+USAGE
 }
 
-open_easy_menu() {
-  EASY_AUTONOMY_TUI_DRY_RUN="$DRY_RUN" \
-  GASSIAN_TUI_FORCE_PLAIN="$TUI_FORCE_PLAIN" \
-  GASSIAN_TUI_USE_WHIPTAIL="$TUI_USE_WHIPTAIL" \
-  GASSIAN_TUI_AUTOTEST="$TUI_AUTOTEST" \
-    "${SCRIPT_DIR}/easy_autonomy_tui.sh"
-}
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --safe-mode)
+      SAFE_MODE=1
+      shift 1
+      ;;
+    --force-plain)
+      FORCE_PLAIN=1
+      shift 1
+      ;;
+    --start-section)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --start-section" >&2
+        exit 1
+      fi
+      START_SECTION="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown arg: $1" >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
 
-open_control_center() {
-  CONTROL_TUI_DRY_RUN="$DRY_RUN" \
-  GASSIAN_TUI_FORCE_PLAIN="$TUI_FORCE_PLAIN" \
-  GASSIAN_TUI_USE_WHIPTAIL="$TUI_USE_WHIPTAIL" \
-  GASSIAN_TUI_AUTOTEST="$TUI_AUTOTEST" \
-    "${SCRIPT_DIR}/control_center.sh"
-}
-
-open_gaussian_menu() {
-  if [[ "$DRY_RUN" == "1" ]]; then
-    GS_TUI_SAFE_MODE=1 "${SCRIPT_DIR}/gs_tui.sh"
-    return 0
+if [[ "$FORCE_PLAIN" == "1" || ! -t 0 || ! -t 1 ]] || ! command -v python3 >/dev/null 2>&1; then
+  legacy_cmd=("${SCRIPT_DIR}/master_tui_legacy.sh" --force-plain)
+  if [[ "$SAFE_MODE" == "1" ]]; then
+    legacy_cmd+=(--safe-mode)
   fi
-  "${SCRIPT_DIR}/gs_tui.sh"
-}
+  if [[ -n "$START_SECTION" ]]; then
+    legacy_cmd+=(--start-section "$START_SECTION")
+  fi
+  exec env MASTER_TUI_AUTOTEST="$AUTOTEST" "${legacy_cmd[@]}"
+fi
 
-main_menu() {
-  while true; do
-    show_banner
-    local mode="LIVE"
-    if [[ "$DRY_RUN" == "1" ]]; then
-      mode="DRY-RUN"
-    fi
-
-    local choice
-    if ! choice="$(tui_menu_choice \
-      "GassianRobot Launcher (${mode})" \
-      "Start with the Easy Robot Scan Menu unless you already know you need something else." \
-      "1" "Easy robot scan menu (recommended)" \
-      "2" "Advanced robot tools" \
-      "3" "Gaussian capture / training workflow" \
-      "4" "Software readiness audit" \
-      "5" "Toggle dry-run mode" \
-      "6" "Exit")"; then
-      echo "Bye."
-      return 0
-    fi
-
-    case "$choice" in
-      1) open_easy_menu ;;
-      2) open_control_center ;;
-      3) open_gaussian_menu ;;
-      4) tui_run_cmd "$DRY_RUN" "${SCRIPT_DIR}/build/software_readiness_audit.sh" ;;
-      5)
-        if [[ "$DRY_RUN" == "1" ]]; then
-          DRY_RUN=0
-        else
-          DRY_RUN=1
-        fi
-        ;;
-      6)
-        echo "Bye."
-        return 0
-        ;;
-      *)
-        ;;
-    esac
-  done
-}
-
-main_menu
+ncurses_cmd=(python3 "${SCRIPT_DIR}/master_ncurses_tui.py")
+if [[ "$SAFE_MODE" == "1" ]]; then
+  ncurses_cmd+=(--safe-mode)
+fi
+if [[ -n "$START_SECTION" ]]; then
+  ncurses_cmd+=(--start-section "$START_SECTION")
+fi
+exec "${ncurses_cmd[@]}"

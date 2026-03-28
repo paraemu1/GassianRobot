@@ -196,44 +196,49 @@ run_step "Purge trash dry-run" "${SCRIPT_DIR}/../run_tools/purge_run_trash.sh" -
 run_step "Cleanup stale training state dry-run" "${SCRIPT_DIR}/../gaussian/cleanup_stale_training_state.sh" --dry-run
 
 # Gaussian workflow menu actions (safe mode)
-run_tui_sequence "TUI Gaussian: camera health" "1\n1\n0\n0\n"
-run_tui_sequence "TUI Gaussian: capture handheld" "1\n2\n0\n0\n"
-run_tui_sequence "TUI Gaussian: prep existing run" "1\n3\n1\n0\n0\n"
-run_tui_sequence "TUI Gaussian: start training" "1\n4\n1\n0\n0\n"
-run_tui_sequence "TUI Gaussian: watch logs" "1\n5\n1\n0\n0\n"
-run_tui_sequence "TUI Gaussian: training status" "1\n6\n1\n0\n0\n"
-run_tui_sequence "TUI Gaussian: stop training" "1\n7\n1\n0\n0\n"
-run_tui_sequence "TUI Gaussian: start viewer" "1\n8\n1\n0\n0\n"
-run_tui_sequence "TUI Gaussian: stop viewer" "1\n9\n1\n0\n0\n"
-run_tui_sequence "TUI Gaussian: show exported splats" "1\n10\n0\n0\n"
+run_tui_sequence "TUI Gaussian: guided status" "1\n1\n0\n0\n"
+run_tui_sequence "TUI Gaussian: guided choose run" "1\n2\n1\n0\n0\n"
+run_tui_sequence "TUI Gaussian: prep existing run" "2\n1\n0\n0\n"
+run_tui_sequence "TUI Gaussian: start training" "3\n1\n0\n0\n"
+run_tui_sequence "TUI Gaussian: watch logs" "4\n1\n0\n0\n"
+run_tui_sequence "TUI Gaussian: training status" "5\n1\n0\n0\n"
+run_tui_sequence "TUI Gaussian: stop training" "6\n1\n0\n0\n"
+run_tui_sequence "TUI Gaussian: start viewer + browser" "7\n1\n0\n0\n"
+run_tui_sequence "TUI Gaussian: start viewer" "8\n1\n0\n0\n"
+run_tui_sequence "TUI Gaussian: stop viewer" "9\n1\n0\n0\n"
+run_tui_sequence "TUI Gaussian: show exported splats" "10\n0\n0\n"
+
+# Handheld capture menu actions (safe mode)
+run_tui_sequence "TUI Handheld: camera health" "0\n3\n1\n0\n0\n"
+run_tui_sequence "TUI Handheld: capture handheld" "0\n3\n2\n0\n0\n"
 
 # Run management menu actions (safe mode)
-run_tui_sequence "TUI Runs: list with badges" "2\n1\n0\n0\n"
-run_tui_sequence "TUI Runs: inspect details" "2\n2\n1\n0\n0\n"
-run_tui_sequence "TUI Runs: delete run dry-run" "2\n3\n1\n0\n0\n"
-run_tui_sequence "TUI Runs: purge trash" "2\n5\n0\n0\n"
+run_tui_sequence "TUI Runs: list with badges" "0\n5\n1\n0\n0\n"
+run_tui_sequence "TUI Runs: inspect details" "0\n5\n2\n1\n0\n0\n"
+run_tui_sequence "TUI Runs: delete run dry-run" "0\n5\n3\n1\n0\n0\n"
+run_tui_sequence "TUI Runs: purge trash" "0\n5\n5\n0\n0\n"
 
-# Docker/environment menu actions (safe mode)
-run_tui_sequence "TUI Docker: build training cached" "3\n1\n0\n0\n"
-run_tui_sequence "TUI Docker: validate training clean" "3\n2\n0\n0\n"
-run_tui_sequence "TUI Docker: build rtabmap" "3\n3\n0\n0\n"
-run_tui_sequence "TUI Docker: validate all" "3\n4\n0\n0\n"
+# Builds menu actions (safe mode)
+run_tui_sequence "TUI Builds: build training cached" "0\n6\n1\n0\n0\n"
+run_tui_sequence "TUI Builds: validate training clean" "0\n6\n2\n0\n0\n"
+run_tui_sequence "TUI Builds: build rtabmap" "0\n6\n3\n0\n0\n"
+run_tui_sequence "TUI Builds: validate all" "0\n6\n4\n0\n0\n"
 
-# Robot ops menu actions (safe mode preview)
-run_tui_sequence "TUI Robot: run rtabmap container" "4\n1\n0\n0\n"
-run_tui_sequence "TUI Robot: run oak camera" "4\n2\n0\n0\n"
-run_tui_sequence "TUI Robot: run rtabmap rgbd" "4\n3\n0\n0\n"
-run_tui_sequence "TUI Robot: record raw bag" "4\n4\n0\n0\n"
-run_tui_sequence "TUI Robot: run nav2" "4\n5\n0\n0\n"
-run_tui_sequence "TUI Robot: send nav2 goal" "4\n6\n0\n0\n"
-run_tui_sequence "TUI Robot: teleop keyboard" "4\n7\n0\n0\n"
-run_tui_sequence "TUI Robot: teleop arrows" "4\n8\n0\n0\n"
-run_tui_sequence "TUI Robot: ros health" "4\n9\n0\n0\n"
+# Robot tools menu actions (safe mode preview)
+run_tui_sequence "TUI Robot: run rtabmap container" "0\n2\n11\n0\n0\n"
+run_tui_sequence "TUI Robot: run oak camera" "0\n2\n12\n0\n0\n"
+run_tui_sequence "TUI Robot: run rtabmap rgbd" "0\n2\n13\n0\n0\n"
+run_tui_sequence "TUI Robot: record raw bag" "0\n2\n14\n0\n0\n"
+run_tui_sequence "TUI Robot: run nav2" "0\n2\n15\n0\n0\n"
+run_tui_sequence "TUI Robot: send nav2 goal" "0\n2\n16\n0\n0\n"
+run_tui_sequence "TUI Robot: teleop keyboard" "0\n2\n6\n0\n0\n"
+run_tui_sequence "TUI Robot: teleop arrows" "0\n2\n5\n0\n0\n"
+run_tui_sequence "TUI Robot: ros health" "0\n2\n7\n0\n0\n"
 
 # Diagnostics menu actions (safe mode)
-run_tui_sequence "TUI Diagnostics: docker status" "5\n2\n0\n0\n"
-run_tui_sequence "TUI Diagnostics: viewer containers" "5\n3\n0\n0\n"
-run_tui_sequence "TUI Diagnostics: cleanup stale state" "5\n4\n0\n0\n"
+run_tui_sequence "TUI Diagnostics: docker status" "0\n7\n2\n0\n0\n"
+run_tui_sequence "TUI Diagnostics: viewer containers" "0\n7\n3\n0\n0\n"
+run_tui_sequence "TUI Diagnostics: cleanup stale state" "0\n7\n4\n0\n0\n"
 
 echo ""
 echo "Self-test summary: ${passes} passed, ${failures} failed."
