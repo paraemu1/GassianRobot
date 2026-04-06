@@ -99,9 +99,8 @@ WAYPOINT_FILE=./config/scan_waypoints_room_a_conservative.tsv \
 - The validated floor-run path is `run_local_stopgo_scan_mission.sh`, not the older Nav2-style `run_auto_scan_mission.sh`.
 - On a drive abort or unsafe cliff boundary during the survey, the mission backtracks executed segments toward entry instead of trying to push farther into the same obstacle or ledge.
 - This is software orchestration; tuning, map quality, and obstacle behavior still depend on supervised live robot testing.
-- Use `./scripts/easy_autonomy_tui.sh` for operator-facing menu access.
-- Use `./scripts/control_center.sh` only when you need the advanced manual/diagnostic tools.
-- Use `./scripts/master_tui.sh` only as a simple ncurses launcher into the easy menu, advanced robot tools, or Gaussian workflow.
+- Use `./scripts/master_tui.sh` as the single root shell entrypoint for robot scan, robot tools, handheld capture, Gaussian workflow, runs, builds, and diagnostics.
+- Use `./scripts/master_tui.sh --start-section robot-scan` or `./scripts/master_tui.sh --start-section robot-tools` when you want to open a section directly without extra wrapper scripts.
 
 ## Current validation status on this Jetson
 

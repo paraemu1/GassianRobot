@@ -8,38 +8,30 @@ If a command fails, first run:
 cd /home/cam/GassianRobot
 ```
 
-## 1) Open the full workflow TUI (recommended)
-
-```bash
-./scripts/gs_tui.sh
-```
-
-This now opens the ncurses-based workflow UI by default on a real terminal.
-
-For first-time robot operators, use the simplest scan menu:
-
-```bash
-./scripts/easy_autonomy_tui.sh
-```
-
-For advanced robot control + navigation checks, use the dedicated control center:
-
-```bash
-./scripts/control_center.sh
-```
-
-For the top-level launcher that points you to the easy scan menu, advanced robot tools, or Gaussian workflow, use:
+## 1) Open the master TUI (recommended)
 
 ```bash
 ./scripts/master_tui.sh
 ```
 
-Use these top-level menus:
-1. Gaussian workflow
-2. Run management
-3. Docker & environment
-4. RTAB-Map / Nav2 / robot ops
-5. Diagnostics
+This opens the unified master UI on a real terminal.
+
+To jump straight into a section, use the same root launcher with `--start-section`:
+
+```bash
+./scripts/master_tui.sh --start-section robot-scan
+./scripts/master_tui.sh --start-section robot-tools
+./scripts/master_tui.sh --start-section gaussian
+```
+
+Use these top-level master sections:
+1. Scan a room with the robot
+2. Advanced robot tools
+3. Capture with handheld camera
+4. Make a 3D browser view from a saved run
+5. Saved runs
+6. Build and setup
+7. Troubleshooting
 
 Non-destructive self-test:
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 OUT_DIR="${REPO_ROOT}/runs/system_audit"
 mkdir -p "$OUT_DIR"
@@ -44,10 +45,16 @@ for img in gassian/robot-runtime:latest gassian/ros2-humble-rtabmap:latest gassi
   if docker image inspect "$img" >/dev/null 2>&1; then p "docker image present: $img"; else w "docker image missing: $img"; fi
 done
 
+mapfile -t ROOT_TUI_SCRIPTS < <(find "${REPO_ROOT}/scripts" -maxdepth 1 -type f -name '*.sh' | sort)
+if [[ "${#ROOT_TUI_SCRIPTS[@]}" -eq 1 && "$(basename "${ROOT_TUI_SCRIPTS[0]}")" == "master_tui.sh" ]]; then
+  p "scripts/ root keeps a single shell launcher: scripts/master_tui.sh"
+else
+  f "scripts/ root shell launchers are not normalized: ${ROOT_TUI_SCRIPTS[*]}"
+fi
+
 for s in \
-  scripts/easy_autonomy_tui.sh \
-  scripts/control_center.sh \
   scripts/master_tui.sh \
+  scripts/master_ncurses_tui.py \
   scripts/robot/teleop_drive_app.sh \
   scripts/robot/teleop_drive_app.py \
   scripts/robot/launch_live_auto_scan.sh \
@@ -61,7 +68,7 @@ for s in \
   if [[ -f "$REPO_ROOT/$s" ]]; then p "file exists: $s"; else f "missing file: $s"; fi
 done
 
-for s in scripts/easy_autonomy_tui.sh scripts/control_center.sh scripts/master_tui.sh; do
+for s in scripts/master_tui.sh; do
   if [[ -x "$REPO_ROOT/$s" ]]; then
     p "executable: $s"
   else

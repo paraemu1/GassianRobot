@@ -89,11 +89,15 @@ if [[ -n "$pid" ]] && ps -p "$pid" >/dev/null 2>&1; then
 fi
 
 state=""
+backend=""
+memory_profile=""
 started_at=""
 ended_at=""
 exit_code=""
 if [[ -f "$status_file" ]]; then
   state="$(run_utils_read_status_value "$status_file" "state" || true)"
+  backend="$(run_utils_read_status_value "$status_file" "backend" || true)"
+  memory_profile="$(run_utils_read_status_value "$status_file" "memory_profile" || true)"
   started_at="$(run_utils_read_status_value "$status_file" "started_at" || true)"
   ended_at="$(run_utils_read_status_value "$status_file" "ended_at" || true)"
   exit_code="$(run_utils_read_status_value "$status_file" "exit_code" || true)"
@@ -123,6 +127,8 @@ if [[ "$FORMAT" == "env" ]]; then
   echo "RUN_DIR=${RUN_DIR}"
   echo "RUN_REL=${run_rel}"
   echo "STATE=${effective_state}"
+  echo "BACKEND=${backend}"
+  echo "MEMORY_PROFILE=${memory_profile}"
   echo "PID=${pid}"
   echo "ACTIVE_PID=${active_pid}"
   echo "STALE_PID=${stale_pid}"
@@ -138,6 +144,12 @@ fi
 
 echo "Run: ${run_rel}"
 echo "State: ${effective_state}"
+if [[ -n "$backend" ]]; then
+  echo "Backend: ${backend}"
+fi
+if [[ -n "$memory_profile" ]]; then
+  echo "Memory profile: ${memory_profile}"
+fi
 if [[ -n "$pid" ]]; then
   if [[ "$active_pid" -eq 1 ]]; then
     echo "PID: ${pid} (active)"

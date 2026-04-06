@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -13,7 +14,7 @@ MARKER_FILENAME = "HANDHELD_CAMERA_MOTION_TEST.txt"
 
 
 def repo_root() -> Path:
-    return Path(__file__).resolve().parent.parent
+    return Path(__file__).resolve().parent.parent.parent
 
 
 def run_checked(cmd: list[str], cwd: Path) -> None:
@@ -58,7 +59,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     root = repo_root()
-    scripts_dir = root / "scripts"
+    gaussian_scripts_dir = root / "scripts" / "gaussian"
+    prep_force = os.environ.get("GAUSSIAN_PREP_FORCE", "").strip().lower() in {"1", "true", "yes", "on"}
 
     if args.run:
         run_dir = Path(args.run).expanduser().resolve()
@@ -91,7 +93,7 @@ def main() -> int:
                         filter_output = capture
 
                     filter_cmd = [
-                        str(scripts_dir / "filter_blurry_video_frames.sh"),
+                        str(gaussian_scripts_dir / "filter_blurry_video_frames.sh"),
                         "--input",
                         str(filter_input),
                         "--output",
@@ -106,14 +108,14 @@ def main() -> int:
                     if filter_output.name == "capture_filtered_tmp.mp4":
                         filter_output.replace(capture)
 
-            run_checked(
-                [str(scripts_dir / "prepare_gs_input_from_run.sh"), "--run", str(run_dir)],
-                cwd=root,
-            )
+            prepare_cmd = [str(gaussian_scripts_dir / "prepare_gs_input_from_run.sh"), "--run", str(run_dir)]
+            if prep_force:
+                prepare_cmd.append("--force")
+            run_checked(prepare_cmd, cwd=root)
 
         if args.mode in ("train", "prep-train"):
             cmd = [
-                str(scripts_dir / "process_train_export.sh"),
+                str(gaussian_scripts_dir / "process_train_export.sh"),
                 "--run",
                 str(run_dir),
                 "--from-run-env",

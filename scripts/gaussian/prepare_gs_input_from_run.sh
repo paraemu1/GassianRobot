@@ -86,7 +86,12 @@ fi
 
 resolved_source="$SOURCE_MODE"
 if [[ "$SOURCE_MODE" == "auto" ]]; then
-  if [[ -f "$DATASET_TRANSFORMS" ]]; then
+  # A forced prep pass should prefer regenerating from RTAB-Map when available
+  # so low-memory profiles can actually reduce the dataset instead of reusing a
+  # previously exported full-resolution/full-frame dataset.
+  if [[ "$FORCE" -eq 1 && -f "$RTABMAP_DB_PATH" ]]; then
+    resolved_source="rtabmap-db"
+  elif [[ -f "$DATASET_TRANSFORMS" ]]; then
     resolved_source="dataset"
   elif [[ -f "$RTABMAP_DB_PATH" ]]; then
     resolved_source="rtabmap-db"

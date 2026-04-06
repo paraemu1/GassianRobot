@@ -13,7 +13,7 @@ Repository for Jetson-first robotics capture, Gaussian splat training/viewing, a
 
 ## Repository Layout
 
-- `scripts/`: operational entrypoints, TUIs, wrappers, and health checks
+- `scripts/`: operational entrypoints, TUI support files, and health checks
 - `docs/`: setup guides, validated runbooks, project context, and dated handoff notes
 - `runs/`: run directories and outputs for capture, preprocessing, training, and exports
 - `config/`: checked-in config artifacts such as waypoint tables
@@ -29,10 +29,8 @@ Repository for Jetson-first robotics capture, Gaussian splat training/viewing, a
 
 ## Common Entry Points
 
-- `./scripts/gs_tui.sh`: main Gaussian workflow menu
-- `./scripts/easy_autonomy_tui.sh`: simple operator menu for dock / health / start-only / mission / full scan
-- `./scripts/control_center.sh`: advanced robot control and diagnostics
-- `./scripts/master_tui.sh`: thin top-level launcher for easy scan / advanced robot tools / Gaussian workflow
+- `./scripts/master_tui.sh`: unified master TUI for robot scan, robot tools, handheld capture, Gaussian workflow, runs, builds, and diagnostics
+- `./scripts/master_tui.sh --start-section robot-scan|robot-tools|handheld|gaussian|runs|builds|diagnostics`: jump directly into a section without extra wrapper scripts
 - `./scripts/build/build_robot_runtime_image.sh`: preferred robot runtime image build
 - `./scripts/robot/run_robot_runtime_container.sh`: preferred robot runtime shell launcher
 - `./scripts/build/validate_docker_builds.sh --mode cached --target all`: quick environment validation

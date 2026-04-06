@@ -144,7 +144,7 @@ This prevents accidental selection of `runs/camera_health` for training.
 Use full workflow TUI:
 
 ```bash
-./scripts/gs_tui.sh
+./scripts/master_tui.sh --start-section gaussian
 ```
 
 Detailed menu map:

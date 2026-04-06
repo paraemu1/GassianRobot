@@ -4,35 +4,24 @@ Use this folder for executable entrypoints. Most day-to-day work should start fr
 
 ## Main Menus
 
-- Root `scripts/` now keeps only the TUI entrypoints.
-- `./scripts/easy_autonomy_tui.sh`: ncurses-first operator menu for the validated scan flow
-- `./scripts/gs_tui.sh`: primary Gaussian capture/train/view workflow
-- `./scripts/control_center.sh`: advanced Create 3 control, teleop, ROS checks, and guided bringup notes
-- `./scripts/master_tui.sh`: thin top-level launcher that points operators toward the easy scan menu first
-- `./scripts/gs_tui_legacy.sh`: fallback plain/whiptail Gaussian TUI
-- `./scripts/gs_ncurses_tui.py`: ncurses Gaussian TUI implementation
+- Root `scripts/` keeps one shell launcher plus support files.
+- `./scripts/master_tui.sh`: unified master entrypoint for robot scan, robot tools, Gaussian workflow, runs, builds, and diagnostics
+- `./scripts/master_ncurses_tui.py`: ncurses implementation behind `master_tui.sh`
 
 ## What Each TUI Does
 
 - `./scripts/master_tui.sh`
-  Top-level launcher. Use this if you are not sure where to start. It sends you to the easy robot scan menu, the advanced robot tools, or the Gaussian workflow menu.
-- `./scripts/easy_autonomy_tui.sh`
-  Beginner-friendly robot operator menu. Use this for normal scan sessions. It keeps the common flow simple: health check, prepare the scan stack, start the mission, dock or undock, check status, and review previous scan runs.
-- `./scripts/control_center.sh`
-  Advanced robot menu. Use this when you need manual control or lower-level checks instead of the simplified scan workflow. It exposes teleop, ROS health checks, autonomy preflight, and readiness/audit tools.
-- `./scripts/gs_tui.sh`
-  Main entrypoint for Gaussian splatting work. Use this for run preparation, training, viewer control, run inspection, and build or diagnostic tasks related to the Gaussian pipeline. It decides whether to launch the ncurses UI or the legacy shell UI.
-- `./scripts/gs_ncurses_tui.py`
-  Ncurses implementation behind `gs_tui.sh`. This is the full-screen keyboard-driven Gaussian menu shown in a real terminal. Most users should launch `gs_tui.sh` instead of calling this directly.
-- `./scripts/gs_tui_legacy.sh`
-  Fallback shell/whiptail Gaussian menu. This exists for non-interactive shells, environments where the ncurses UI is not suitable, and self-test automation. It is useful for debugging, but it is not the preferred day-to-day entrypoint.
+  The one shell entrypoint in `scripts/`. Use this if you want the full project interface in one place. It owns the robot scan flow, advanced robot tools, handheld capture, Gaussian workflow, runs, builds, and diagnostics.
+- `./scripts/master_ncurses_tui.py`
+  Ncurses implementation behind `master_tui.sh`. Use `./scripts/master_tui.sh --modern-ui` if you want to force that full-screen interface directly.
 
 ## Which One To Use
 
-- New robot operator: `./scripts/easy_autonomy_tui.sh`
-- Someone who wants one launcher first: `./scripts/master_tui.sh`
-- Advanced robot debugging or manual driving: `./scripts/control_center.sh`
-- Gaussian capture, training, and viewer workflow: `./scripts/gs_tui.sh`
+- Use one launcher for everything: `./scripts/master_tui.sh`
+- Jump straight into robot scan: `./scripts/master_tui.sh --start-section robot-scan`
+- Jump straight into robot tools: `./scripts/master_tui.sh --start-section robot-tools`
+- Jump straight into handheld capture: `./scripts/master_tui.sh --start-section handheld`
+- Jump straight into Gaussian workflow: `./scripts/master_tui.sh --start-section gaussian`
 
 ## Directory Layout
 
@@ -124,10 +113,9 @@ Use this folder for executable entrypoints. Most day-to-day work should start fr
 - `check_rtabmap_sync.sh` now covers both live timestamp deltas and TF readiness for `odom <- base_link`; set `CHECK_MAP_ODOM_TF=1` after RTAB-Map starts if you also want `map <- odom` checked in the same pass.
 - The preferred full autonomous scan entrypoint is `./scripts/robot/launch_live_auto_scan.sh start`. It starts Docker if needed, starts the runtime container, both Create 3 bridges, OAK, RTAB-Map, Nav2, saves the RTAB-Map database into the run directory, auto-undocks, runs the stop-and-go mission, stops the stack, and then re-docks on a successful mission.
 - `launch_live_auto_scan.sh start-only` brings the stack up without motion, `launch_live_auto_scan.sh mission` runs only the mission/closeout on an already-running stack, and `launch_live_auto_scan.sh stop|status` handle shutdown and inspection.
-- `easy_autonomy_tui.sh` is the simplest operator-facing entrypoint. It now prefers an ncurses menu via `whiptail`, remembers the last run name for the two-step `start-only` then `mission` flow, and exposes only the common actions needed for a supervised scan session.
-- `control_center.sh` has been pruned down to advanced/manual tools only; the older duplicated scan actions were removed so operators are funneled into `easy_autonomy_tui.sh`.
-- `master_tui.sh` has also been pruned. It is now just a top-level launcher, not a separate nested autonomy workflow.
-- The operator-facing TUI scripts now share the same helper code and hand off directly between menus instead of wrapping interactive TUIs inside extra shell prompts.
+- `scripts/` root now keeps one shell launcher: `master_tui.sh`.
+- Jump directly into a specific section with `master_tui.sh --start-section robot-scan|robot-tools|handheld|gaussian|runs|builds|diagnostics`.
+- `master_ncurses_tui.py` remains the ncurses implementation behind `master_tui.sh`.
 - `run_local_stopgo_scan_mission.sh` is now the default floor-run mission path. It runs an outward-only stop-go survey, captures at survey stops, and then returns by backtracking executed segments instead of capturing again on the way back.
 - `launch_live_auto_scan.sh` now runs `create3_motion_ready_check.sh` after undock / settle. That check is meant to catch unsafe cliff readings before the mission starts; a stationary `stop_status` bit by itself is not treated as a hard failure.
 - The live mission now treats drive aborts and unsafe cliff readings as boundary events. On a real ledge / obstacle stop, it backtracks toward entry instead of issuing more forward segments into the same blockage.

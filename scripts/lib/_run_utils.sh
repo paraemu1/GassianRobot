@@ -135,9 +135,21 @@ run_utils_is_trainable_run() {
   [[ -f "${run_dir}/raw/capture.mp4" || -f "${run_dir}/gs_input.env" || -f "${run_dir}/rtabmap.db" || -f "${run_dir}/dataset/transforms.json" ]]
 }
 
+run_utils_is_jetson_gsplat_trainable_run() {
+  local run_dir="$1"
+  [[ -f "${run_dir}/rtabmap.db" || -f "${run_dir}/dataset/transforms.json" ]]
+}
+
 run_utils_is_viewer_ready_run() {
   local run_dir="$1"
-  find "${run_dir}/checkpoints" -name config.yml -print -quit 2>/dev/null | grep -q .
+  local config_path model_dir
+  while IFS= read -r config_path; do
+    model_dir="$(dirname "$config_path")/nerfstudio_models"
+    if [[ -d "$model_dir" ]]; then
+      return 0
+    fi
+  done < <(find "${run_dir}/checkpoints" -name config.yml 2>/dev/null | sort)
+  return 1
 }
 
 run_utils_is_trained_export_run() {
@@ -155,6 +167,9 @@ run_utils_run_matches_context() {
       ;;
     trainable)
       run_utils_is_trainable_run "$run_dir"
+      ;;
+    jetson_gsplat_trainable)
+      run_utils_is_jetson_gsplat_trainable_run "$run_dir"
       ;;
     viewer_ready)
       run_utils_is_viewer_ready_run "$run_dir"
@@ -185,8 +200,11 @@ run_utils_context_description() {
     trainable)
       echo "trainable runs (must have raw/capture.mp4, rtabmap.db, dataset/transforms.json, or gs_input.env)"
       ;;
+    jetson_gsplat_trainable)
+      echo "Jetson gsplat-ready runs (must have rtabmap.db or dataset/transforms.json)"
+      ;;
     viewer_ready)
-      echo "viewer-ready runs (must have checkpoints/**/config.yml)"
+      echo "viewer-ready runs (must have checkpoints/**/config.yml and checkpoints/**/nerfstudio_models)"
       ;;
     trained_export)
       echo "runs with exported splats (exports/splat/splat.ply)"
@@ -210,6 +228,10 @@ run_utils_run_status_badges() {
 
   if run_utils_is_trainable_run "$run_dir"; then
     badges+=("trainable")
+  fi
+
+  if run_utils_is_jetson_gsplat_trainable_run "$run_dir"; then
+    badges+=("jetson-gsplat")
   fi
 
   if [[ -f "${run_dir}/rtabmap.db" ]]; then
@@ -336,6 +358,9 @@ run_utils_pick_latest_by_context() {
       ;;
     trainable)
       run_utils_latest_trainable_run "$repo_root"
+      ;;
+    jetson_gsplat_trainable)
+      run_utils_latest_matching_run "$repo_root" "jetson_gsplat_trainable"
       ;;
     viewer_ready)
       run_utils_latest_viewer_ready_run "$repo_root"

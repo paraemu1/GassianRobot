@@ -23,7 +23,7 @@ MARKER_FILENAME = "HANDHELD_CAMERA_MOTION_TEST.txt"
 
 
 def repo_root() -> Path:
-    return Path(__file__).resolve().parent.parent
+    return Path(__file__).resolve().parent.parent.parent
 
 
 def run_checked(cmd: list[str], cwd: Path) -> None:
@@ -69,7 +69,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def create_run_folder(root: Path, scene: str) -> Path:
-    scripts_dir = root / "scripts"
+    run_tools_dir = root / "scripts" / "run_tools"
     runs_dir = root / "runs"
     date_stamp = dt.date.today().isoformat()
     run_dir = runs_dir / f"{date_stamp}-{scene}"
@@ -78,7 +78,7 @@ def create_run_folder(root: Path, scene: str) -> Path:
         scene = f"{scene}_{dt.datetime.now().strftime('%H%M%S')}"
         run_dir = runs_dir / f"{date_stamp}-{scene}"
 
-    run_checked([str(scripts_dir / "init_run_dir.sh"), scene], cwd=root)
+    run_checked([str(run_tools_dir / "init_run_dir.sh"), scene], cwd=root)
     return run_dir
 
 
@@ -100,7 +100,8 @@ def label_run(run_dir: Path, blur_threshold: float) -> None:
 def main() -> int:
     args = parse_args()
     root = repo_root()
-    scripts_dir = root / "scripts"
+    gaussian_scripts_dir = root / "scripts" / "gaussian"
+    robot_scripts_dir = root / "scripts" / "robot"
 
     if args.dry_run:
         date_stamp = dt.date.today().isoformat()
@@ -114,7 +115,7 @@ def main() -> int:
             "  "
             + " ".join(
                 [
-                    str(scripts_dir / "record_oak_rgb_video.sh"),
+                    str(robot_scripts_dir / "record_oak_rgb_video.sh"),
                     "--output",
                     str(run_preview / "raw" / "capture_raw.mp4"),
                     "--duration",
@@ -134,7 +135,7 @@ def main() -> int:
             "  "
             + " ".join(
                 [
-                    str(scripts_dir / "filter_blurry_video_frames.sh"),
+                    str(gaussian_scripts_dir / "filter_blurry_video_frames.sh"),
                     "--input",
                     str(run_preview / "raw" / "capture_raw.mp4"),
                     "--output",
@@ -164,7 +165,7 @@ def main() -> int:
             "  "
             + " ".join(
                 [
-                    str(scripts_dir / "prepare_gs_input_from_run.sh"),
+                    str(gaussian_scripts_dir / "prepare_gs_input_from_run.sh"),
                     "--run",
                     str(run_preview),
                 ]
@@ -192,7 +193,7 @@ def main() -> int:
         capture_mp4 = run_dir / "raw" / "capture.mp4"
         run_checked(
             [
-                str(scripts_dir / "record_oak_rgb_video.sh"),
+                str(robot_scripts_dir / "record_oak_rgb_video.sh"),
                 "--output",
                 str(capture_raw_mp4),
                 "--duration",
@@ -211,7 +212,7 @@ def main() -> int:
 
         run_checked(
             [
-                str(scripts_dir / "filter_blurry_video_frames.sh"),
+                str(gaussian_scripts_dir / "filter_blurry_video_frames.sh"),
                 "--input",
                 str(capture_raw_mp4),
                 "--output",
@@ -239,7 +240,7 @@ def main() -> int:
         )
 
         run_checked(
-            [str(scripts_dir / "prepare_gs_input_from_run.sh"), "--run", str(run_dir)],
+            [str(gaussian_scripts_dir / "prepare_gs_input_from_run.sh"), "--run", str(run_dir)],
             cwd=root,
         )
 
@@ -249,7 +250,9 @@ def main() -> int:
         print(f"Video: {capture_mp4}")
         print(f"Frames: {run_dir / 'raw' / 'images'}")
         print("\nNext:")
-        print(f"{scripts_dir / 'run_handheld_prep_or_train.sh'} --run {run_dir} --mode prep-train")
+        print(
+            f"{gaussian_scripts_dir / 'run_handheld_prep_or_train.sh'} --run {run_dir} --mode prep-train"
+        )
         return 0
     except subprocess.CalledProcessError as exc:
         print(f"Command failed with exit code {exc.returncode}", file=sys.stderr)

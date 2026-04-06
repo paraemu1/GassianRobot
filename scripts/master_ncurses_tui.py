@@ -22,6 +22,45 @@ DEFAULT_DURATION = "20"
 DEFAULT_DAYS = "30"
 
 
+def detect_total_ram_gb() -> Optional[int]:
+    try:
+        page_size = os.sysconf("SC_PAGE_SIZE")
+        page_count = os.sysconf("SC_PHYS_PAGES")
+    except (AttributeError, ValueError, OSError):
+        return None
+
+    if page_size <= 0 or page_count <= 0:
+        return None
+
+    total_bytes = page_size * page_count
+    gib = 1024 ** 3
+    return max(1, (total_bytes + gib - 1) // gib)
+
+
+def recommended_memory_profile(total_gb: Optional[int]) -> str:
+    if total_gb is None or total_gb <= 12:
+        return "low"
+    if total_gb <= 24:
+        return "medium"
+    return "high"
+
+
+def memory_profile_label(profile: str) -> str:
+    return {
+        "low": "Safer Fewer Frames (8 GB RAM or less)",
+        "medium": "Balanced Memory And Quality (16 GB RAM)",
+        "high": "Highest Detail And Memory Use (32 GB RAM or more)",
+    }.get(profile, profile)
+
+
+def memory_profile_downscale(profile: str) -> str:
+    return {
+        "low": "3",
+        "medium": "2",
+        "high": "1",
+    }.get(profile, "2")
+
+
 @dataclass
 class RunInfo:
     path: Path
@@ -33,6 +72,12 @@ class RunInfo:
         if self.badges:
             return f"{self.rel} " + " ".join(f"[{badge}]" for badge in self.badges)
         return self.rel
+
+
+@dataclass
+class ViewerContainerInfo:
+    name: str
+    label: str
 
 
 @dataclass
@@ -49,6 +94,7 @@ class App:
         self.status = "Ready"
         self.running = True
         self.guided_run_override: Optional[Path] = None
+        self.total_ram_gb = detect_total_ram_gb()
 
     def run(self) -> None:
         curses.curs_set(0)
@@ -74,16 +120,16 @@ class App:
             self.menu_loop(
                 "GassianRobot Master TUI",
                 [
-                    MenuItem("Robot Scan (recommended)", self.robot_scan_menu),
-                    MenuItem("Robot Tools", self.robot_tools_menu),
-                    MenuItem("Handheld Capture", self.handheld_capture_menu),
-                    MenuItem("Turn Scan Into 3D Browser View", self.gaussian_menu),
-                    MenuItem("Run Management", self.runs_menu),
-                    MenuItem("Builds", self.builds_menu),
-                    MenuItem("Diagnostics", self.diagnostics_menu),
-                    MenuItem("Toggle Safe Mode", self.toggle_safe_mode),
-                    MenuItem("Quick Guide", self.show_master_quick_guide),
-                    MenuItem("Quit", self.quit),
+                    MenuItem("Scan A Room With The Robot (recommended)", self.robot_scan_menu),
+                    MenuItem("Advanced Robot Tools", self.robot_tools_menu),
+                    MenuItem("Capture With Handheld Camera", self.handheld_capture_menu),
+                    MenuItem("Make A 3D Browser View From A Saved Run", self.gaussian_menu),
+                    MenuItem("Saved Runs", self.runs_menu),
+                    MenuItem("Build And Setup", self.builds_menu),
+                    MenuItem("Troubleshooting", self.diagnostics_menu),
+                    MenuItem("Toggle Preview Mode", self.toggle_safe_mode),
+                    MenuItem("Simple Guide", self.show_master_quick_guide),
+                    MenuItem("Exit", self.quit),
                 ],
                 subtitle="Arrow keys to move, Enter to select, q to back/quit.",
             )
@@ -125,7 +171,7 @@ class App:
             elif key in (10, 13, curses.KEY_ENTER):
                 item = items[index]
                 normalized = item.label.lower()
-                if normalized == "quit":
+                if normalized in {"quit", "exit"}:
                     self.quit()
                     return
                 if normalized == "back":
@@ -277,6 +323,8 @@ class App:
         badges: List[str] = []
         if self.is_trainable(run_dir):
             badges.append("trainable")
+        if self.is_jetson_gsplat_trainable(run_dir):
+            badges.append("jetson-gsplat")
         if (run_dir / "rtabmap.db").is_file():
             badges.append("rtabmap-db")
         if self.is_viewer_ready(run_dir):
@@ -319,8 +367,14 @@ class App:
             ]
         )
 
+    def is_jetson_gsplat_trainable(self, run_dir: Path) -> bool:
+        return (run_dir / "rtabmap.db").is_file() or (run_dir / "dataset" / "transforms.json").is_file()
+
     def is_viewer_ready(self, run_dir: Path) -> bool:
-        return any((run_dir / "checkpoints").glob("**/config.yml"))
+        for config_path in (run_dir / "checkpoints").glob("**/config.yml"):
+            if (config_path.parent / "nerfstudio_models").is_dir():
+                return True
+        return False
 
     def has_train_logs(self, run_dir: Path) -> bool:
         logs_dir = run_dir / "logs"
@@ -370,6 +424,8 @@ class App:
         all_runs = self.list_runs()
         if context == "trainable":
             runs = [run for run in all_runs if self.is_trainable(run.path)]
+        elif context == "jetson_gsplat_trainable":
+            runs = [run for run in all_runs if self.is_jetson_gsplat_trainable(run.path)]
         elif context == "guided":
             runs = self.guided_runs()
         elif context == "viewer_ready":
@@ -453,6 +509,73 @@ class App:
             elif key in (27, ord("q")):
                 return None
 
+    def viewer_container_name_for_run(self, run: RunInfo) -> str:
+        run_slug = re.sub(r"[^A-Za-z0-9]+", "_", run.path.name)
+        return f"gs_viewer_{run_slug}"
+
+    def viewer_container_choices(self) -> List[ViewerContainerInfo]:
+        choices: List[ViewerContainerInfo] = []
+        try:
+            result = subprocess.run(
+                ["docker", "ps", "--format", "{{.Names}}"],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            if result.returncode == 0:
+                for line in result.stdout.splitlines():
+                    name = line.strip()
+                    if not name.startswith("gs_viewer_"):
+                        continue
+                    choices.append(ViewerContainerInfo(name=name, label=f"{name} [running browser view]"))
+        except FileNotFoundError:
+            pass
+
+        if choices or not self.safe_mode:
+            return choices
+
+        for run in self.list_runs():
+            if self.is_viewer_ready(run.path):
+                name = self.viewer_container_name_for_run(run)
+                choices.append(ViewerContainerInfo(name=name, label=f"{name} [{run.rel}]"))
+        return choices
+
+    def select_viewer_container(self, title: str) -> Optional[ViewerContainerInfo]:
+        choices = self.viewer_container_choices()
+        if not choices:
+            self.show_message(title, "No running browser views were found.")
+            return None
+
+        index = 0
+        top = 0
+        while True:
+            height, width = self.stdscr.getmaxyx()
+            visible_rows = max(5, height - 6)
+            if index < top:
+                top = index
+            if index >= top + visible_rows:
+                top = index - visible_rows + 1
+
+            self.stdscr.erase()
+            self.draw_header(title, "Enter to select a browser view, q to cancel.")
+            for row, choice in enumerate(choices[top : top + visible_rows], start=0):
+                y = 2 + row
+                attr = curses.A_REVERSE if top + row == index else curses.A_NORMAL
+                self.stdscr.addnstr(y, 2, choice.label, max(1, width - 4), attr)
+            self.draw_footer()
+            self.stdscr.refresh()
+
+            key = self.stdscr.getch()
+            if key in (curses.KEY_UP, ord("k")):
+                index = (index - 1) % len(choices)
+            elif key in (curses.KEY_DOWN, ord("j")):
+                index = (index + 1) % len(choices)
+            elif key in (10, 13, curses.KEY_ENTER):
+                return choices[index]
+            elif key in (27, ord("q")):
+                return None
+
     def default_scan_run_name(self) -> str:
         return subprocess.run(["date", "+%F-%H%M"], text=True, capture_output=True, check=False).stdout.strip() + "-easy-auto-scan"
 
@@ -498,10 +621,10 @@ class App:
         if run is None:
             return (
                 "No scan selected yet",
-                "Create a run in Robot Scan or Handheld Capture.",
+                "Create a run in Scan A Room With The Robot or Capture With Handheld Camera.",
                 [
                     "No scan or training run is selected yet.",
-                    "Create a run in Robot Scan or Handheld Capture, then come back here.",
+                    "Create a run in Scan A Room With The Robot or Capture With Handheld Camera, then come back here.",
                 ],
             )
 
@@ -541,7 +664,7 @@ class App:
             next_step = "Prepare this run for 3D model training."
         else:
             stage = "This run is missing usable scan data"
-            next_step = "Pick a different run or create one in Robot Scan or Handheld Capture."
+            next_step = "Pick a different run or create one in Scan A Room With The Robot or Capture With Handheld Camera."
 
         if state == "exited":
             lines.append(f"Last training exit code: {exit_code or 'unknown'}")
@@ -574,14 +697,18 @@ class App:
         )
 
     def choose_training_mode(self) -> Optional[str]:
-        options = ["prep-train", "train", "prep"]
+        options = [
+            ("Prepare Then Train 3D Model (recommended)", "prep-train"),
+            ("Train Using Existing Prepared Data Only", "train"),
+            ("Only Prepare Run For Training", "prep"),
+        ]
         index = 0
         while True:
             self.stdscr.erase()
-            self.draw_header("Training Mode", "Enter to select, q to cancel.")
+            self.draw_header("Training Mode", "Choose what should happen next. Enter to select, q to cancel.")
             for row, item in enumerate(options, start=0):
                 attr = curses.A_REVERSE if row == index else curses.A_NORMAL
-                self.stdscr.addnstr(2 + row, 2, item, max(1, self.stdscr.getmaxyx()[1] - 4), attr)
+                self.stdscr.addnstr(2 + row, 2, item[0], max(1, self.stdscr.getmaxyx()[1] - 4), attr)
             self.draw_footer()
             self.stdscr.refresh()
             key = self.stdscr.getch()
@@ -590,7 +717,45 @@ class App:
             elif key in (curses.KEY_DOWN, ord("j")):
                 index = (index + 1) % len(options)
             elif key in (10, 13, curses.KEY_ENTER):
-                return options[index]
+                return options[index][1]
+            elif key in (27, ord("q")):
+                return None
+
+    def choose_memory_profile(self) -> Optional[str]:
+        recommended = recommended_memory_profile(self.total_ram_gb)
+        subtitle = "Choose the memory level for this training run."
+        if self.total_ram_gb is not None:
+            subtitle += f" Detected system memory: about {self.total_ram_gb} GB."
+        subtitle += f" Recommended: {memory_profile_label(recommended)}"
+
+        if (
+            os.environ.get("MASTER_TUI_AUTOTEST") == "1"
+            or os.environ.get("GASSIAN_TUI_AUTOTEST") == "1"
+            or os.environ.get("GS_TUI_AUTOTEST") == "1"
+        ):
+            return recommended
+
+        options = [
+            (memory_profile_label("low"), "low"),
+            (memory_profile_label("medium"), "medium"),
+            (memory_profile_label("high"), "high"),
+        ]
+        index = next((i for i, item in enumerate(options) if item[1] == recommended), 0)
+        while True:
+            self.stdscr.erase()
+            self.draw_header("Memory Level", subtitle + " Enter to select, q to cancel.")
+            for row, item in enumerate(options, start=0):
+                attr = curses.A_REVERSE if row == index else curses.A_NORMAL
+                self.stdscr.addnstr(2 + row, 2, item[0], max(1, self.stdscr.getmaxyx()[1] - 4), attr)
+            self.draw_footer()
+            self.stdscr.refresh()
+            key = self.stdscr.getch()
+            if key in (curses.KEY_UP, ord("k")):
+                index = (index - 1) % len(options)
+            elif key in (curses.KEY_DOWN, ord("j")):
+                index = (index + 1) % len(options)
+            elif key in (10, 13, curses.KEY_ENTER):
+                return options[index][1]
             elif key in (27, ord("q")):
                 return None
 
@@ -599,13 +764,13 @@ class App:
             "Quick Guide",
             "\n".join(
                 [
-                    "Use Robot Scan for the normal supervised Create 3 scan flow.",
-                    "Use Robot Tools for manual driving, health checks, and bringup helpers.",
-                    "Use Handheld Capture only when you want to create a run with a handheld camera instead of the robot.",
-                    "Use Turn Scan Into 3D Browser View after you already have a run and want a browser-viewable model.",
-                    "Inside Turn Scan Into 3D Browser View, use Guided Scan To Browser if you want the simplest path.",
-                    "Use Run Management to inspect or clean up runs.",
-                    "Use Builds and Diagnostics for Docker/runtime troubleshooting.",
+                    "Use Scan A Room With The Robot for the normal supervised robot scan flow.",
+                    "Use Advanced Robot Tools for manual driving, health checks, and lower-level robot setup.",
+                    "Use Capture With Handheld Camera only when you want to create a run with a handheld camera instead of the robot.",
+                    "Use Make A 3D Browser View From A Saved Run after you already have a run and want a browser-viewable model.",
+                    "Inside that menu, start with the guided option if you want the simplest path.",
+                    "Use Saved Runs to inspect, delete, or restore runs.",
+                    "Use Build And Setup or Troubleshooting only when you need maintenance or recovery tools.",
                 ]
             ),
         )
@@ -616,10 +781,10 @@ class App:
             "\n".join(
                 [
                     'Recommended order:',
-                    '1. "Run Full Scan Now" for the normal one-command workflow.',
-                    '2. "Prepare Scan Stack Without Motion" and then "Start Prepared Mission" only when you want to inspect first.',
-                    '3. "Show Robot + Scan Status" or "Dock Robot" to recover or check the session.',
-                    '4. After the scan finishes, open "Turn Scan Into 3D Browser View" and choose "Guided Scan To Browser".',
+                    '1. "Start A Room Scan Now" for the normal one-command workflow.',
+                    '2. "Get Ready To Scan Without Moving Yet" and then "Start The Prepared Scan" only when you want to inspect first.',
+                    '3. "Show Robot And Scan Status" or "Send Robot To Dock" to recover or check the session.',
+                    '4. After the scan finishes, open "Make A 3D Browser View From A Saved Run" and choose the guided option.',
                     "",
                     "Safety:",
                     "- Keep the robot on the floor.",
@@ -637,12 +802,14 @@ class App:
                     "This section turns an existing run into a 3D model you can open in a web browser.",
                     "",
                     "Normal order:",
-                    "1. Create a run with Robot Scan or Handheld Capture.",
+                    "1. Create a run with Scan A Room With The Robot or Capture With Handheld Camera.",
                     "2. Prepare that scan for training.",
-                    "3. Start training the 3D model.",
-                    "4. Open the finished model in the browser.",
+                    "3. Choose a memory level that fits this machine.",
+                    "4. Start training the 3D model.",
+                    "5. Open the finished model in the browser.",
                     "",
-                    "Use Guided Scan To Browser if you do not know which step comes next.",
+                    "Lower-memory choices keep fewer frames so training is more likely to finish on smaller Jetson-class machines.",
+                    "Use the guided option if you do not know which step comes next.",
                 ]
             ),
         )
@@ -664,16 +831,16 @@ class App:
 
     def robot_scan_menu(self) -> None:
         self.menu_loop(
-            "Robot Scan",
+            "Scan A Room With The Robot",
             [
-                MenuItem("Run Full Scan Now (recommended)", self.full_scan_now),
-                MenuItem("Prepare Scan Stack Without Motion", self.prepare_scan_stack),
-                MenuItem("Start Prepared Mission", self.start_prepared_mission),
-                MenuItem("Show Robot + Scan Status", self.show_scan_status),
-                MenuItem("List Previous Scan Runs", self.show_scan_history),
-                MenuItem("Dock Robot", self.dock_robot),
+                MenuItem("Start A Room Scan Now (recommended)", self.full_scan_now),
+                MenuItem("Get Ready To Scan Without Moving Yet", self.prepare_scan_stack),
+                MenuItem("Start The Prepared Scan", self.start_prepared_mission),
+                MenuItem("Show Robot And Scan Status", self.show_scan_status),
+                MenuItem("Show Previous Robot Scans", self.show_scan_history),
+                MenuItem("Send Robot To Dock", self.dock_robot),
                 MenuItem("Undock Robot", self.undock_robot),
-                MenuItem("Show Quick Guide", self.show_robot_scan_quick_guide),
+                MenuItem("Explain Robot Scan", self.show_robot_scan_quick_guide),
                 MenuItem("Back", lambda: None),
             ],
             subtitle=f"Last prepared run: {self.current_scan_run_label()}",
@@ -755,27 +922,27 @@ class App:
 
     def robot_tools_menu(self) -> None:
         self.menu_loop(
-            "Robot Tools",
+            "Advanced Robot Tools",
             [
-                MenuItem("Check Robot USB-C Link", self.connection_report),
+                MenuItem("Check Robot Connection", self.connection_report),
                 MenuItem("Run Robot Health Check", self.run_robot_health_check),
-                MenuItem("Manual Drive App", self.manual_drive),
-                MenuItem("GameCube Controller Teleop", self.gamecube_teleop),
-                MenuItem("Arrow-Key Teleop", self.teleop_arrows),
-                MenuItem("Keyboard Teleop", self.teleop_keyboard),
-                MenuItem("ROS Health Check", self.ros_health_check),
-                MenuItem("Autonomy Preflight", self.preflight_autonomy),
-                MenuItem("Software Readiness Audit", self.software_readiness_audit),
-                MenuItem("Guided Nav2 + Scan Startup Notes", self.guided_nav2_start),
-                MenuItem("Run Robot Runtime Container", self.run_robot_runtime_container),
-                MenuItem("Run OAK ROS Camera", self.run_oak_camera),
-                MenuItem("Run RTAB-Map RGBD", self.run_rtabmap_rgbd),
-                MenuItem("Record Raw Bag", self.record_raw_bag),
-                MenuItem("Run Nav2 With RTAB-Map", self.run_nav2_with_rtabmap),
-                MenuItem("Send Nav2 Goal", self.send_nav2_goal),
+                MenuItem("Drive Robot Manually", self.manual_drive),
+                MenuItem("Drive With GameCube Controller", self.gamecube_teleop),
+                MenuItem("Drive With Arrow Keys", self.teleop_arrows),
+                MenuItem("Drive With Keyboard", self.teleop_keyboard),
+                MenuItem("Check ROS Health", self.ros_health_check),
+                MenuItem("Run Autonomy Preflight Check", self.preflight_autonomy),
+                MenuItem("Check Software Setup", self.software_readiness_audit),
+                MenuItem("Show Advanced Startup Notes", self.guided_nav2_start),
+                MenuItem("Start Robot Runtime", self.run_robot_runtime_container),
+                MenuItem("Start Camera Driver", self.run_oak_camera),
+                MenuItem("Start Live Mapping", self.run_rtabmap_rgbd),
+                MenuItem("Record Raw Sensor Data", self.record_raw_bag),
+                MenuItem("Start Navigation With Live Map", self.run_nav2_with_rtabmap),
+                MenuItem("Send Robot To A Goal", self.send_nav2_goal),
                 MenuItem("Back", lambda: None),
             ],
-            subtitle="Manual control, runtime bringup, and lower-level checks.",
+            subtitle="Manual control, advanced setup, and lower-level robot tools.",
         )
 
     def connection_report(self) -> None:
@@ -903,10 +1070,10 @@ class App:
 
     def handheld_capture_menu(self) -> None:
         self.menu_loop(
-            "Handheld Capture",
+            "Capture With Handheld Camera",
             [
-                MenuItem("Camera Health Check", self.camera_health),
-                MenuItem("Capture Handheld Scan", self.capture_handheld),
+                MenuItem("Check Camera Health", self.camera_health),
+                MenuItem("Start Handheld Capture", self.capture_handheld),
                 MenuItem("Explain Handheld Capture", self.show_handheld_plain_english_guide),
                 MenuItem("Back", lambda: None),
             ],
@@ -919,12 +1086,13 @@ class App:
             stage, next_step, _ = self.guided_run_state(run)
             selected_label = run.rel if run is not None else "none"
             items = [
-                MenuItem("Show Current Status + Recommended Next Step", self.show_guided_status),
-                MenuItem("Choose Which Run To Use", self.choose_guided_run),
-                MenuItem("Prepare Selected Run For Training", self.guided_prepare_selected_run),
-                MenuItem("Start Training For Selected Run", self.guided_start_training),
+                MenuItem("Show Current Status And Next Step", self.show_guided_status),
+                MenuItem("Choose Saved Run", self.choose_guided_run),
+                MenuItem("Prepare Saved Run For Training (choose memory level)", self.guided_prepare_selected_run),
+                MenuItem("Start 3D Model Training (choose memory level)", self.guided_start_training),
+                MenuItem("Start Jetson Orin Nano 8GB gsplat Training", self.guided_start_training_jetson_gsplat),
                 MenuItem("Watch Training Progress", self.guided_watch_training_logs),
-                MenuItem("Open Selected Model In Browser", self.guided_open_viewer),
+                MenuItem("Show Tailscale URL For 3D Model", self.guided_open_viewer),
                 MenuItem("Explain This Workflow", self.show_gaussian_plain_english_guide),
                 MenuItem("Back", lambda: None),
             ]
@@ -941,7 +1109,7 @@ class App:
 
                 self.stdscr.erase()
                 subtitle = f"Selected run: {selected_label} | Stage: {stage} | Next: {next_step}"
-                self.draw_header("Guided Scan To Browser", subtitle)
+                self.draw_header("Guided: Saved Run To Browser View", subtitle)
                 for row, item in enumerate(items[top : top + visible_rows], start=0):
                     y = 2 + row
                     attr = curses.A_REVERSE if top + row == index else curses.A_NORMAL
@@ -965,19 +1133,20 @@ class App:
 
     def gaussian_menu(self) -> None:
         self.menu_loop(
-            "Turn Scan Into 3D Browser View",
+            "Make A 3D Browser View From A Saved Run",
             [
-                MenuItem("Guided Scan To Browser (recommended)", self.guided_scan_to_browser_menu),
-                MenuItem("Prep Existing Run", self.prepare_run),
-                MenuItem("Start Training", self.start_training),
-                MenuItem("Watch Training Logs", self.watch_training_logs),
-                MenuItem("Training Status", self.training_status),
+                MenuItem("Guided: Saved Run To Browser View (recommended)", self.guided_scan_to_browser_menu),
+                MenuItem("Prepare Saved Run For Training (choose memory level)", self.prepare_run),
+                MenuItem("Train 3D Model (choose memory level)", self.start_training),
+                MenuItem("Train 3D Model With Jetson Orin Nano 8GB gsplat Constraints", self.start_training_jetson_gsplat),
+                MenuItem("Watch Training Progress", self.watch_training_logs),
+                MenuItem("Show Training Status", self.training_status),
                 MenuItem("Stop Training", self.stop_training),
-                MenuItem("Start Viewer + Open Browser", self.start_viewer_and_open_browser),
-                MenuItem("Start Viewer", self.start_viewer),
-                MenuItem("Stop Viewer", self.stop_viewer),
-                MenuItem("Show Exported Splat Paths", self.show_exported_splats),
-                MenuItem("Explain Workflow In Plain English", self.show_gaussian_plain_english_guide),
+                MenuItem("Start Browser View And Show Tailscale URL", self.start_viewer_and_open_browser),
+                MenuItem("Start Browser View", self.start_viewer),
+                MenuItem("Stop Browser View", self.stop_viewer),
+                MenuItem("Show Saved 3D Model Files", self.show_exported_splats),
+                MenuItem("Explain This Workflow", self.show_gaussian_plain_english_guide),
                 MenuItem("Back", lambda: None),
             ],
             subtitle="Use this after you already have a run. This section prepares, trains, and opens the 3D model.",
@@ -999,11 +1168,25 @@ class App:
         )
 
     def prepare_run(self) -> None:
-        run = self.select_run("trainable", "Prep Existing Run")
+        run = self.select_run("trainable", "Prepare Saved Run For Training")
         if run is None:
             return
+        memory_profile = self.choose_memory_profile()
+        if memory_profile is None:
+            return
         self.run_command(
-            [str(SCRIPTS_DIR / "gaussian/start_gaussian_training_job.sh"), "--run", str(run.path), "--mode", "prep", "--foreground"],
+            [
+                str(SCRIPTS_DIR / "gaussian/start_gaussian_training_job.sh"),
+                "--run",
+                str(run.path),
+                "--mode",
+                "prep",
+                "--foreground",
+                "--memory-profile",
+                memory_profile,
+                "--downscale",
+                memory_profile_downscale(memory_profile),
+            ],
             safe_behavior="append-dry-run",
             extra_safe_args=["--dry-run"],
         )
@@ -1013,17 +1196,35 @@ class App:
         if run is None:
             self.show_message("Prepare Run", "No guided run is selected yet.")
             return
+        memory_profile = self.choose_memory_profile()
+        if memory_profile is None:
+            return
         self.run_command(
-            [str(SCRIPTS_DIR / "gaussian/prepare_gs_input_from_run.sh"), "--run", str(run.path)],
-            safe_behavior="preview",
+            [
+                str(SCRIPTS_DIR / "gaussian/start_gaussian_training_job.sh"),
+                "--run",
+                str(run.path),
+                "--mode",
+                "prep",
+                "--foreground",
+                "--memory-profile",
+                memory_profile,
+                "--downscale",
+                memory_profile_downscale(memory_profile),
+            ],
+            safe_behavior="append-dry-run",
+            extra_safe_args=["--dry-run"],
         )
 
     def start_training(self) -> None:
-        run = self.select_run("trainable", "Start Training")
+        run = self.select_run("trainable", "Train 3D Model")
         if run is None:
             return
         mode = self.choose_training_mode()
         if mode is None:
+            return
+        memory_profile = self.choose_memory_profile()
+        if memory_profile is None:
             return
         iterations = self.prompt_input("Training Iterations", "Set max training iterations.", DEFAULT_ITERS)
         if iterations is None:
@@ -1039,6 +1240,36 @@ class App:
                 mode,
                 "--max-iters",
                 iterations,
+                "--memory-profile",
+                memory_profile,
+                "--downscale",
+                memory_profile_downscale(memory_profile),
+            ],
+            safe_behavior="append-dry-run",
+            extra_safe_args=["--dry-run"],
+        )
+
+    def start_training_jetson_gsplat(self) -> None:
+        run = self.select_run("jetson_gsplat_trainable", "Train 3D Model With Jetson gsplat")
+        if run is None:
+            return
+        mode = self.choose_training_mode()
+        if mode is None:
+            return
+        iterations = self.prompt_input("Training Iterations", "Set max training iterations.", DEFAULT_ITERS)
+        if iterations is None:
+            return
+        if not iterations.isdigit() or int(iterations) <= 0:
+            iterations = DEFAULT_ITERS
+        self.run_command(
+            [
+                str(SCRIPTS_DIR / "gaussian/start_jetson_orin_nano_gsplat_training_job.sh"),
+                "--run",
+                str(run.path),
+                "--mode",
+                mode,
+                "--max-steps",
+                iterations,
             ],
             safe_behavior="append-dry-run",
             extra_safe_args=["--dry-run"],
@@ -1047,7 +1278,10 @@ class App:
     def guided_start_training(self) -> None:
         run = self.selected_guided_run()
         if run is None:
-            self.show_message("Start Training", "No guided run is selected yet.")
+            self.show_message("Train 3D Model", "No guided run is selected yet.")
+            return
+        memory_profile = self.choose_memory_profile()
+        if memory_profile is None:
             return
         self.run_command(
             [
@@ -1058,13 +1292,42 @@ class App:
                 "prep-train",
                 "--max-iters",
                 DEFAULT_ITERS,
+                "--memory-profile",
+                memory_profile,
+                "--downscale",
+                memory_profile_downscale(memory_profile),
+            ],
+            safe_behavior="append-dry-run",
+            extra_safe_args=["--dry-run"],
+        )
+
+    def guided_start_training_jetson_gsplat(self) -> None:
+        run = self.selected_guided_run()
+        if run is None:
+            self.show_message("Jetson gsplat Training", "No guided run is selected yet.")
+            return
+        if not self.is_jetson_gsplat_trainable(run.path):
+            self.show_message(
+                "Jetson gsplat Training",
+                "This separate Jetson gsplat path needs either:\n\n- dataset/transforms.json\n- rtabmap.db\n\nRaw video-only runs are not supported by this path.",
+            )
+            return
+        self.run_command(
+            [
+                str(SCRIPTS_DIR / "gaussian/start_jetson_orin_nano_gsplat_training_job.sh"),
+                "--run",
+                str(run.path),
+                "--mode",
+                "prep-train",
+                "--max-steps",
+                DEFAULT_ITERS,
             ],
             safe_behavior="append-dry-run",
             extra_safe_args=["--dry-run"],
         )
 
     def watch_training_logs(self) -> None:
-        run = self.select_run("train_logs", "Watch Training Logs")
+        run = self.select_run("train_logs", "Watch Training Progress")
         if run is None:
             return
         extra = ["--dry-run", "--no-follow"] if self.safe_mode else []
@@ -1079,7 +1342,7 @@ class App:
         self.run_command([str(SCRIPTS_DIR / "gaussian/watch_gaussian_training_job.sh"), "--run", str(run.path), *extra], safe_behavior="pass")
 
     def training_status(self) -> None:
-        run = self.select_run("train_metadata", "Training Status")
+        run = self.select_run("train_metadata", "Show Training Status")
         if run is None:
             return
         self.run_command([str(SCRIPTS_DIR / "gaussian/training_job_status.sh"), "--run", str(run.path)], safe_behavior="pass")
@@ -1095,7 +1358,7 @@ class App:
         )
 
     def start_viewer(self) -> None:
-        run = self.select_run("viewer_ready", "Start Viewer")
+        run = self.select_run("viewer_ready", "Start Browser View")
         if run is None:
             return
         port = self.prompt_input("Viewer Port", "Viewer port to bind on localhost.", DEFAULT_PORT)
@@ -1110,7 +1373,7 @@ class App:
         )
 
     def start_viewer_and_open_browser(self) -> None:
-        run = self.select_run("viewer_ready", "Start Viewer + Open Browser")
+        run = self.select_run("viewer_ready", "Start Browser View And Show Tailscale URL")
         if run is None:
             return
         port = self.prompt_input("Viewer Port", "Viewer port to bind on localhost.", DEFAULT_PORT)
@@ -1143,11 +1406,11 @@ class App:
         )
 
     def stop_viewer(self) -> None:
-        run = self.select_run("viewer_ready", "Stop Viewer")
-        if run is None:
+        choice = self.select_viewer_container("Stop Browser View")
+        if choice is None:
             return
         self.run_command(
-            [str(SCRIPTS_DIR / "gaussian/stop_gaussian_viewer.sh"), "--run", str(run.path)],
+            [str(SCRIPTS_DIR / "gaussian/stop_gaussian_viewer.sh"), "--container-name", choice.name],
             safe_behavior="append-dry-run",
             extra_safe_args=["--dry-run"],
         )
@@ -1160,17 +1423,17 @@ class App:
                 lines.append(str(splat.relative_to(REPO_ROOT)))
         if not lines:
             lines = ["No exported splats found under runs/."]
-        self.show_message("Exported Splat Paths", "\n".join(lines))
+        self.show_message("Saved 3D Model Files", "\n".join(lines))
 
     def runs_menu(self) -> None:
         self.menu_loop(
-            "Run Management",
+            "Saved Runs",
             [
-                MenuItem("List Runs With Status Badges", self.show_all_runs),
-                MenuItem("Inspect Run Details", self.inspect_run),
-                MenuItem("Delete Run (soft delete)", self.delete_run),
-                MenuItem("Restore Deleted Run", self.restore_run),
-                MenuItem("Purge Trash Older Than N Days", self.purge_trash),
+                MenuItem("List Saved Runs", self.show_all_runs),
+                MenuItem("Inspect Saved Run", self.inspect_run),
+                MenuItem("Move Run To Trash", self.delete_run),
+                MenuItem("Restore Run From Trash", self.restore_run),
+                MenuItem("Empty Old Trash", self.purge_trash),
                 MenuItem("Back", lambda: None),
             ],
         )
@@ -1239,12 +1502,12 @@ class App:
 
     def builds_menu(self) -> None:
         self.menu_loop(
-            "Builds",
+            "Build And Setup",
             [
-                MenuItem("Build Training Images (cached)", self.build_training_images),
-                MenuItem("Validate Training Builds (clean)", self.validate_training_clean),
-                MenuItem("Build RTAB-Map / Robot Runtime Image", self.build_robot_runtime),
-                MenuItem("Validate All Builds", self.validate_all_builds),
+                MenuItem("Build 3D Training Images", self.build_training_images),
+                MenuItem("Test 3D Training Build", self.validate_training_clean),
+                MenuItem("Build Robot Runtime Image", self.build_robot_runtime),
+                MenuItem("Test All Builds", self.validate_all_builds),
                 MenuItem("Back", lambda: None),
             ],
         )
@@ -1275,12 +1538,12 @@ class App:
 
     def diagnostics_menu(self) -> None:
         self.menu_loop(
-            "Diagnostics",
+            "Troubleshooting",
             [
-                MenuItem("Run TUI Self-Tests", self.run_tui_self_tests),
-                MenuItem("Show Docker Runtime Status", self.show_docker_status),
-                MenuItem("Show Viewer Containers", self.show_viewer_containers),
-                MenuItem("Cleanup Stale Training State", self.cleanup_stale_training_state),
+                MenuItem("Run Menu Self-Tests", self.run_tui_self_tests),
+                MenuItem("Show Docker Status", self.show_docker_status),
+                MenuItem("Show Browser View Containers", self.show_viewer_containers),
+                MenuItem("Clean Up Stale Training State", self.cleanup_stale_training_state),
                 MenuItem("Back", lambda: None),
             ],
         )

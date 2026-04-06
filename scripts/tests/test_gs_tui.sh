@@ -3,12 +3,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-TUI_SCRIPT="${SCRIPT_DIR}/../gs_tui.sh"
+TUI_SCRIPT="${SCRIPT_DIR}/../master_tui.sh"
+TUI_ARGS=(--start-section gaussian)
 KEEP_RUN=0
 
 usage() {
   cat <<'USAGE'
-Run non-destructive checks for the full workflow TUI.
+Run non-destructive checks for the master TUI Gaussian section.
 
 Usage:
   ./scripts/tests/test_gs_tui.sh [--keep-run]
@@ -83,7 +84,7 @@ run_step_expect() {
   shift 2
   local out_file
   out_file="$(mktemp)"
-  if "$@" >"$out_file" 2>&1 && grep -Eq "$pattern" "$out_file"; then
+  if "$@" >"$out_file" 2>&1 && grep -Eq -- "$pattern" "$out_file"; then
     echo "[PASS] $label"
     passes=$((passes + 1))
   else
@@ -94,13 +95,62 @@ run_step_expect() {
   rm -f "$out_file"
 }
 
+run_step_expect_active_job_noop() {
+  local label="$1"
+  local run_dir="$2"
+  shift 2
+  local out_file
+  local sleeper_pid
+  out_file="$(mktemp)"
+  (
+    sleep 30
+  ) &
+  sleeper_pid="$!"
+  echo "$sleeper_pid" > "${run_dir}/logs/train_job.pid"
+  cat > "${run_dir}/logs/train_job.status" <<STATUS
+state=running
+run_dir=${run_dir}
+pid=${sleeper_pid}
+started_at=2026-01-01T00:00:00+00:00
+mode=prep-train
+memory_profile=low
+log_file=${run_dir}/logs/train_job.latest.log
+launcher=${run_dir}/logs/train_job_active_test.sh
+STATUS
+
+  if "$@" >"$out_file" 2>&1 && grep -Eq -- "already running" "$out_file"; then
+    echo "[PASS] $label"
+    passes=$((passes + 1))
+  else
+    echo "[FAIL] $label"
+    cat "$out_file"
+    failures=$((failures + 1))
+  fi
+
+  kill "$sleeper_pid" >/dev/null 2>&1 || true
+  wait "$sleeper_pid" 2>/dev/null || true
+  echo "999999" > "${run_dir}/logs/train_job.pid"
+  cat > "${run_dir}/logs/train_job.status" <<'STATUS'
+state=exited
+run_dir=/tmp/placeholder
+pid=999999
+started_at=2026-01-01T00:00:00+00:00
+ended_at=2026-01-01T00:10:00+00:00
+exit_code=0
+mode=prep-train
+log_file=/tmp/placeholder.log
+launcher=/tmp/placeholder.sh
+STATUS
+  rm -f "$out_file"
+}
+
 run_step_not_expect() {
   local label="$1"
   local pattern="$2"
   shift 2
   local out_file
   out_file="$(mktemp)"
-  if "$@" >"$out_file" 2>&1 && ! grep -Eq "$pattern" "$out_file"; then
+  if "$@" >"$out_file" 2>&1 && ! grep -Eq -- "$pattern" "$out_file"; then
     echo "[PASS] $label"
     passes=$((passes + 1))
   else
@@ -116,7 +166,7 @@ run_tui_sequence() {
   local sequence="$2"
   local out_file
   out_file="$(mktemp)"
-  if printf "%b" "$sequence" | GS_TUI_FORCE_PLAIN=1 GS_TUI_SAFE_MODE=1 GS_TUI_AUTOTEST=1 "$TUI_SCRIPT" >"$out_file" 2>&1; then
+  if printf "%b" "$sequence" | MASTER_TUI_FORCE_PLAIN=1 MASTER_TUI_DRY_RUN=1 MASTER_TUI_AUTOTEST=1 "$TUI_SCRIPT" "${TUI_ARGS[@]}" >"$out_file" 2>&1; then
     echo "[PASS] $label"
     passes=$((passes + 1))
   else
@@ -132,9 +182,16 @@ create_fixture_run() {
   local run_dir="$2"
 
   RUN_ROOT="${REPO_ROOT}/runs" "${SCRIPT_DIR}/../run_tools/init_run_dir.sh" "$scene" >/dev/null
-  mkdir -p "${run_dir}/logs" "${run_dir}/raw" "${run_dir}/checkpoints/selftest" "${run_dir}/exports/splat"
+  mkdir -p "${run_dir}/logs" "${run_dir}/raw" "${run_dir}/dataset" "${run_dir}/checkpoints/selftest" "${run_dir}/exports/splat"
+  mkdir -p "${run_dir}/checkpoints/selftest/nerfstudio_models"
 
   touch "${run_dir}/raw/capture.mp4"
+  touch "${run_dir}/rtabmap.db"
+  touch "${run_dir}/dataset/.rtabmap_nerfstudio_export"
+  touch "${run_dir}/dataset/sparse_pc.ply"
+  cat > "${run_dir}/dataset/transforms.json" <<'DATASET'
+{"camera_model":"OPENCV","ply_file_path":"sparse_pc.ply","frames":[]}
+DATASET
   cat > "${run_dir}/gs_input.env" <<'ENV'
 VIDEO_PATH=/tmp/fake.mp4
 ENV
@@ -179,8 +236,11 @@ run_step "Validate docker builds dry-run" "${SCRIPT_DIR}/../build/validate_docke
 run_step "Training status works on explicit run" "${SCRIPT_DIR}/../gaussian/training_job_status.sh" --run "$run_dir_main"
 
 run_step_not_expect "Latest training run excludes camera_health" "camera_health" "${SCRIPT_DIR}/../gaussian/start_gaussian_training_job.sh" --run latest --dry-run
+run_step_not_expect "Latest Jetson gsplat run excludes camera_health" "camera_health" "${SCRIPT_DIR}/../gaussian/start_jetson_orin_nano_gsplat_training_job.sh" --run latest --dry-run
 run_step_not_expect "Latest viewer run excludes camera_health" "camera_health" "${SCRIPT_DIR}/../gaussian/start_gaussian_viewer.sh" --run latest --dry-run
+run_step_expect "Jetson dry-run prefers sparse seeded init" "--pipeline.model.random-init False.*--load-3D-points True" "${SCRIPT_DIR}/../gaussian/start_jetson_orin_nano_gsplat_training_job.sh" --run "$run_dir_main" --dry-run
 run_step_expect "Watch logs resolves latest train log run" "Run:" "${SCRIPT_DIR}/../gaussian/watch_gaussian_training_job.sh" --run latest --dry-run --no-follow
+run_step_expect_active_job_noop "Duplicate start returns success when job is already active" "$run_dir_main" "${SCRIPT_DIR}/../gaussian/start_gaussian_training_job.sh" --run "$run_dir_main"
 
 run_step "Delete run soft-delete flow" "${SCRIPT_DIR}/../run_tools/delete_run.sh" --run "$run_dir_delete" --yes
 
@@ -200,13 +260,14 @@ run_tui_sequence "TUI Gaussian: guided status" "1\n1\n0\n0\n"
 run_tui_sequence "TUI Gaussian: guided choose run" "1\n2\n1\n0\n0\n"
 run_tui_sequence "TUI Gaussian: prep existing run" "2\n1\n0\n0\n"
 run_tui_sequence "TUI Gaussian: start training" "3\n1\n0\n0\n"
-run_tui_sequence "TUI Gaussian: watch logs" "4\n1\n0\n0\n"
-run_tui_sequence "TUI Gaussian: training status" "5\n1\n0\n0\n"
-run_tui_sequence "TUI Gaussian: stop training" "6\n1\n0\n0\n"
-run_tui_sequence "TUI Gaussian: start viewer + browser" "7\n1\n0\n0\n"
-run_tui_sequence "TUI Gaussian: start viewer" "8\n1\n0\n0\n"
-run_tui_sequence "TUI Gaussian: stop viewer" "9\n1\n0\n0\n"
-run_tui_sequence "TUI Gaussian: show exported splats" "10\n0\n0\n"
+run_tui_sequence "TUI Gaussian: start Jetson gsplat training" "4\n1\n0\n0\n"
+run_tui_sequence "TUI Gaussian: watch logs" "5\n1\n0\n0\n"
+run_tui_sequence "TUI Gaussian: training status" "6\n1\n0\n0\n"
+run_tui_sequence "TUI Gaussian: stop training" "7\n1\n0\n0\n"
+run_tui_sequence "TUI Gaussian: start viewer + browser" "8\n1\n0\n0\n"
+run_tui_sequence "TUI Gaussian: start viewer" "9\n1\n0\n0\n"
+run_tui_sequence "TUI Gaussian: stop viewer" "10\n1\n0\n0\n"
+run_tui_sequence "TUI Gaussian: show exported splats" "11\n0\n0\n"
 
 # Handheld capture menu actions (safe mode)
 run_tui_sequence "TUI Handheld: camera health" "0\n3\n1\n0\n0\n"

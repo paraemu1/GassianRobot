@@ -10,6 +10,7 @@ set -euo pipefail
 #   --run runs/2026-02-17-lab \
 #   --downscale 2
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VIDEO_PATH=""
 RUN_DIR=""
 DOWNSCALE=1
@@ -31,6 +32,43 @@ usage() {
   echo "Flags:"
   echo "  --host          run ns-* commands on host instead of Docker"
   echo "  --from-run-env  read VIDEO_PATH or DATASET_DIR from <run>/gs_input.env"
+}
+
+ensure_dataset_downscale_pyramid() {
+  local dataset_dir="$1"
+  local downscale="$2"
+
+  if [[ "$downscale" -le 1 ]]; then
+    return 0
+  fi
+
+  python3 "${SCRIPT_DIR}/ensure_dataset_downscale_pyramid.py" \
+    --dataset "$dataset_dir" \
+    --downscale "$downscale"
+}
+
+ensure_dataset_downscale_pyramid_docker() {
+  local dataset_dir="$1"
+  local downscale="$2"
+  local abs_dataset rel_dataset
+
+  if [[ "$downscale" -le 1 ]]; then
+    return 0
+  fi
+
+  abs_dataset="$(realpath "$dataset_dir")"
+  if [[ "$abs_dataset" != "${PWD}"/* ]]; then
+    echo "Dataset path must be inside repo for docker downscale prep: $dataset_dir"
+    exit 1
+  fi
+  rel_dataset="${abs_dataset#${PWD}/}"
+
+  docker run --rm --network host --ipc host --runtime nvidia \
+    -v "${PWD}:/workspace" -w /workspace \
+    "$TRAIN_IMAGE" \
+    python3 scripts/gaussian/ensure_dataset_downscale_pyramid.py \
+      --dataset "/workspace/${rel_dataset}" \
+      --downscale "$downscale"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -154,6 +192,11 @@ run_host() {
     fi
   fi
 
+  if [[ "$MODE" == "dataset" ]]; then
+    ensure_dataset_downscale_pyramid "${RUN_DIR}/dataset" "$DOWNSCALE" \
+      2>&1 | tee -a "${RUN_DIR}/logs/ns-process-data.log"
+  fi
+
   echo "[2/3] Training splatfacto (host)"
   # shellcheck disable=SC2086
   ns-train splatfacto \
@@ -227,6 +270,11 @@ run_docker() {
       -v "${PWD}:/workspace" -w /workspace \
       "$TRAIN_IMAGE" bash -lc "$process_cmd" \
       2>&1 | tee "${RUN_DIR}/logs/ns-process-data.log"
+  fi
+
+  if [[ "$MODE" == "dataset" ]]; then
+    ensure_dataset_downscale_pyramid_docker "${RUN_DIR}/dataset" "$DOWNSCALE" \
+      2>&1 | tee -a "${RUN_DIR}/logs/ns-process-data.log"
   fi
 
   echo "[2/3] Training splatfacto (docker)"
